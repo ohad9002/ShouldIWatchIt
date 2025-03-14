@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Upload Example</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <h1>Upload Your File</h1>
+
+    <input type="file" id="fileInput">
+    <input type="button" value="Click to create improved" onclick="uploadAndGetSummary()">
+
+    <h2>The summary of the file:</h2>
+    <p id="sumOfFileP"></p>
+
+    <script>
+        function uploadAndGetSummary() {
+            const fileInput = document.querySelector("#fileInput");
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Please select a file first!");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            fetch('/uploadFile', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.querySelector("#sumOfFileP").innerText = data.theResultFromGemini;
+                })
+                .catch(error => {
+                    console.error("Error:", error);
+                    alert("An error occurred while processing your file.");
+                });
+        }
+    </script>
+</body>
+
+</html>
