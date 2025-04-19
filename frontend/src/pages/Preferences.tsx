@@ -123,9 +123,23 @@ const Preferences = () => {
   }
 
   return (
-    <div className="bg-gradient-to-b from-gray-900 to-gray-800 min-h-screen text-white p-6">
-      <h1 className="text-3xl font-bold text-red-500 mb-6">Preferences</h1>
-      <p>Please rate from 1 - lowest to 10 - highest, how important it is for you that any movie in general will have the following:</p>
+    <div
+      className="min-h-screen p-6"
+      style={{
+        backgroundColor: "var(--bg-color)", // Use dark mode background
+        color: "var(--text-color)", // Use dark mode text color
+      }}
+    >
+      <h1
+        className="text-3xl font-bold mb-6"
+        style={{ color: "var(--primary-color)" }}
+      >
+        Preferences
+      </h1>
+      <p>
+        Please rate from 1 - lowest to 10 - highest, how important it is for you
+        that any movie in general will have the following:
+      </p>
 
       {/* Ratings Section */}
       <section className="mb-6">
