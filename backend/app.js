@@ -26,20 +26,8 @@ app.use(cookieParser()); // Parse cookies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded data
 app.use(express.json()); // Parse JSON data
 
-// Allow multiple origins
-const allowedOrigins = [
-    'http://localhost:5173', // Local frontend
-    'https://shouldiwatchit.onrender.com', // Deployed frontend
-];
-
 app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
+    origin: '*', // Allow all origins (for testing only)
     credentials: true, // Allow cookies and credentials
 }));
 
