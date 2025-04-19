@@ -1,4 +1,3 @@
-import React from "react";
 import "./PopcornLoader.css";
 
 const PopcornLoader = () => {
