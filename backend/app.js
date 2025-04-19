@@ -25,12 +25,23 @@ app.use(express.static("public")); // Serve static files
 app.use(cookieParser()); // Parse cookies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded data
 app.use(express.json()); // Parse JSON data
-app.use(
-    cors({
-        origin: 'http://localhost:5173', // Allow frontend requests
-        credentials: true, // Allow cookies and auth headers if needed
-    })
-);
+
+// Allow multiple origins
+const allowedOrigins = [
+    'http://localhost:5173', // Local frontend
+    'https://shouldiwatchit.onrender.com', // Live frontend
+];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true, // Allow cookies and credentials
+}));
 
 // 🔐 JWT Authentication Middleware
 const authenticate = (req, res, next) => {
