@@ -1,42 +1,71 @@
 @import "tailwindcss";
 
-.App {
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
   text-align: center;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-
+/* Bucket shape (trapezoid) */
+.clip-path-bucket {
+  clip-path: polygon(15% 0%, 85% 0%, 100% 100%, 0% 100%);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
+/* Custom animations for popcorn kernels */
+@keyframes popcorn1 {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50px, -100px) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-100px, 0) scale(0.8);
+    opacity: 0;
   }
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+@keyframes popcorn2 {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(50px, -120px) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(100px, 0) scale(0.8);
+    opacity: 0;
+  }
 }
 
-.App-link {
-  color: #61dafb;
+@keyframes popcorn3 {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-30px, -80px) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(30px, 0) scale(0.8);
+    opacity: 0;
+  }
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
+.animate-popcorn1 {
+  animation: popcorn1 3s infinite ease-in-out;
+}
 
-  to {
-    transform: rotate(360deg);
-  }
+.animate-popcorn2 {
+  animation: popcorn2 3s infinite ease-in-out;
+}
+
+.animate-popcorn3 {
+  animation: popcorn3 3s infinite ease-in-out;
 }

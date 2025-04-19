@@ -1,0 +1,109 @@
+/* Loader container */
+.popcorn-loader {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 150px;
+}
+
+/* Static popcorns */
+.static-popcorns {
+  position: absolute;
+  bottom: 70px; /* Position closer to the bucket */
+  width: 80px; /* Narrower width for the popcorn area */
+  display: flex;
+  flex-wrap: wrap; /* Allow wrapping to create rows */
+  justify-content: center;
+  gap: 4px; /* Space between kernels */
+}
+
+.static-kernel {
+  width: 8px; /* Size of the popcorn */
+  height: 8px; /* Size of the popcorn */
+  background: yellow;
+  border-radius: 50%;
+}
+
+/* Popcorn bucket */
+.bucket {
+  position: relative;
+  width: 60px;
+  height: 80px;
+  background: red;
+  clip-path: polygon(0% 0%, 100% 0%, 85% 100%, 15% 100%);
+  overflow: hidden;
+}
+
+.stripes {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    white 0%,
+    white 20%,
+    red 20%,
+    red 40%
+  );
+}
+
+/* Animated popcorn kernels */
+.kernel {
+  position: absolute;
+  width: 8px; /* Match the size of static kernels */
+  height: 8px; /* Match the size of static kernels */
+  background: yellow;
+  border-radius: 50%;
+  bottom: 10px; /* Start inside the bucket */
+  left: 50%; /* Centered horizontally */
+  transform: translateX(-50%);
+  animation: pop-left 3s infinite ease-in-out;
+  opacity: 0;
+}
+
+.kernel1 {
+  animation: pop-left 3s infinite ease-in-out;
+  animation-delay: 0s;
+}
+
+.kernel2 {
+  animation: pop-right 3s infinite ease-in-out;
+  animation-delay: 1s;
+}
+
+.kernel3 {
+  animation: pop-left 3s infinite ease-in-out;
+  animation-delay: 2s;
+}
+
+/* Popcorn animation - fly left */
+@keyframes pop-left {
+  0% {
+    transform: translateX(-50%) translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(-50px) translateY(-120px) scale(1.3); /* Higher arc */
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-100px) translateY(0) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* Popcorn animation - fly right */
+@keyframes pop-right {
+  0% {
+    transform: translateX(-50%) translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(50px) translateY(-120px) scale(1.3); /* Higher arc */
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100px) translateY(0) scale(0.8);
+    opacity: 0;
+  }
+}
