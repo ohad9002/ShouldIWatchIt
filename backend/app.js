@@ -29,7 +29,7 @@ app.use(express.json()); // Parse JSON data
 // Allow multiple origins
 const allowedOrigins = [
     'http://localhost:5173', // Local frontend
-    'https://shouldiwatchit.onrender.com', // Live frontend
+    'https://shouldiwatchit.onrender.com', // Deployed frontend
 ];
 
 app.use(cors({
