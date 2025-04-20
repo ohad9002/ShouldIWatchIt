@@ -1,17 +1,22 @@
 const playwright = require('playwright');
 
 const scrapeMovieDetails = async (movieName, options = { debug: false }) => {
-    const browser = await playwright.chromium.launch({ headless: !options.debug });
-
-    const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Gecko) Chrome/114.0.0.0 Safari/537.36'
-    });
-
-    const page = await context.newPage();
+    console.log(`🔍 Starting scrape for movie: ${movieName}`);
+    let browser;
     let movieData = { rottenTomatoes: null, imdb: null, oscars: null };
 
     try {
-        console.log(`🔍 Scraping details for: ${movieName}`);
+        // Launch Playwright browser
+        browser = await playwright.chromium.launch({
+            headless: !options.debug,
+            executablePath: process.env.PLAYWRIGHT_BROWSERS_PATH || undefined, // Use the correct browser path
+        });
+
+        const context = await browser.newContext({
+            userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Gecko) Chrome/114.0.0.0 Safari/537.36',
+        });
+
+        const page = await context.newPage();
 
         /** ========================== Rotten Tomatoes ========================== **/
         try {
@@ -410,7 +415,9 @@ const scrapeMovieDetails = async (movieName, options = { debug: false }) => {
     movieData.oscars = [];
 }
 } finally {
-    if (!options.debug) await browser.close();
+    if (browser) {
+        await browser.close(); // Ensure the browser is always closed
+    }
 }
 
 /** ========================== Genre Normalization & Cleaning ========================== **/
