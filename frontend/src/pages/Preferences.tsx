@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import useAuthStore from "../store/authStore.ts";
 import ButtonRating from "../components/ButtonRating.tsx";
+import { API_BASE_URL } from "../assets/api";
 
 type Genre = {
   _id: string;
@@ -35,7 +36,7 @@ const Preferences = () => {
           throw new Error("No token available");
         }
 
-        const optionsResponse = await axios.get("http://localhost:5000/api/preferences/options", {
+        const optionsResponse = await axios.get(`${API_BASE_URL}/api/preferences/options`, {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
@@ -43,7 +44,7 @@ const Preferences = () => {
         setGenres(optionsResponse.data.genres);
         setOscars(optionsResponse.data.oscars);
 
-        const preferencesResponse = await axios.get(`http://localhost:5000/api/preferences/${userId}`, {
+        const preferencesResponse = await axios.get(`${API_BASE_URL}/api/preferences/${userId}`, {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
@@ -82,7 +83,7 @@ const Preferences = () => {
       }
 
       await axios.post(
-        "http://localhost:5000/api/preferences/rating",
+        `${API_BASE_URL}/api/preferences/rating`,
         { ...ratings },
         {
           headers: {
@@ -92,7 +93,7 @@ const Preferences = () => {
       );
 
       await axios.post(
-        "http://localhost:5000/api/preferences/genre",
+        `${API_BASE_URL}/api/preferences/genre`,
         { genres: genrePreferences },
         {
           headers: {
@@ -102,7 +103,7 @@ const Preferences = () => {
       );
 
       await axios.post(
-        "http://localhost:5000/api/preferences/oscar",
+        `${API_BASE_URL}/api/preferences/oscar`,
         { categories: oscarPreferences },
         {
           headers: {

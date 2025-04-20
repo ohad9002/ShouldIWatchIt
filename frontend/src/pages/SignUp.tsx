@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import axios, { AxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from "../assets/api";
 
 type ErrorResponse = {
   message: string;
@@ -16,7 +17,7 @@ const SignUp = () => {
     e.preventDefault();
     setError(null);
     try {
-      await axios.post('http://localhost:5000/api/auth/register', { username, password });
+      await axios.post(`${API_BASE_URL}/api/auth/register`, { username, password });
       navigate('/signin');
     } catch (error) {
       const axiosError = error as AxiosError<ErrorResponse>;

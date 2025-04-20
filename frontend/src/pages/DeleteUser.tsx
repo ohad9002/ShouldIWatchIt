@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore';
+import { API_BASE_URL } from "../assets/api";
 
 const DeleteUser = () => {
   const [username, setUsername] = useState('');
@@ -17,7 +18,7 @@ const DeleteUser = () => {
     setSuccess(null);
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/delete', {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/delete`, {
         username,
         password,
       });

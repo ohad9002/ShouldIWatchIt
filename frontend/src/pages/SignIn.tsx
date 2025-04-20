@@ -2,6 +2,7 @@ import { useState } from 'react';
 import axios, { AxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../store/authStore.ts';
+import { API_BASE_URL } from "../assets/api";
 
 type ErrorResponse = {
   message: string;
@@ -18,7 +19,7 @@ const SignIn = () => {
     e.preventDefault();
     setError(null);
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', { username, password });
+      const response = await axios.post(`${API_BASE_URL}/api/auth/login`, { username, password });
       login(response.data.token);
       navigate('/');
     } catch (error) {
