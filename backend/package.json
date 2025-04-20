@@ -7,7 +7,8 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "npx playwright install && echo 'Build complete!'"
+    "build": "npx playwright install && echo 'Build complete!'",
+    "postinstall": "npx playwright install"
   },
   "keywords": [],
   "author": "",
