@@ -31,6 +31,7 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
 
   // Reset the Home page state when resetTrigger changes
   useEffect(() => {
+    console.log("🔄 Resetting Home state due to resetTrigger change.");
     setMovieData(null);
     setQuery("");
     setAiDecision(null);
@@ -41,41 +42,53 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
   // Log `aiDecision` whenever it changes
   useEffect(() => {
     if (aiDecision) {
-      console.log("AI Decision:", aiDecision);
+      console.log("🤖 AI Decision updated:", aiDecision);
     }
   }, [aiDecision]);
 
   const handleSearch = async () => {
+    console.log("🔍 Starting search for movie:", query);
     setError(null);
     setIsLoading(true);
     try {
       if (!query) {
+        console.warn("⚠️ No query provided. Prompting user to enter a movie title.");
         setError("Please enter a movie title.");
         return;
       }
 
+      console.log("📤 Sending request to fetchMovies with query:", query);
       const movieResponse = await fetchMovies(query);
+      console.log("📥 Movie data received from fetchMovies:", movieResponse);
+
       if (!movieResponse) {
+        console.error("❌ No movie data received from fetchMovies.");
         throw new Error("Failed to fetch movie data.");
       }
 
       setMovieData(movieResponse);
 
       if (user?.token) {
+        console.log("🔑 User is logged in. Fetching AI decision...");
         const decisionResponse = await fetchMovieDecision(query, user.token);
+        console.log("📥 AI Decision received from fetchMovieDecision:", decisionResponse);
+
         setAiDecision({
           decision: decisionResponse.decision,
           explanation: decisionResponse.explanation,
         });
+      } else {
+        console.log("ℹ️ User is not logged in. Skipping AI decision fetch.");
       }
     } catch (error) {
-      console.error("Error fetching movie or AI decision:", error); // Log the error
+      console.error("❌ Error during handleSearch:", error);
       if (error instanceof Error) {
         setError(error.message || "Failed to fetch movie or AI decision. Please try again.");
       } else {
         setError("Failed to fetch movie or AI decision. Please try again.");
       }
     } finally {
+      console.log("✅ Search process completed.");
       setIsLoading(false);
     }
   };

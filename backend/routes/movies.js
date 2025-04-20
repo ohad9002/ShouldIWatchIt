@@ -11,16 +11,18 @@ const movieCache = {}; // In-memory cache for scraped movie data
 router.get('/', async (req, res) => {
     try {
         const { title } = req.query;
+        console.log(`🔍 Incoming request to /api/movies with title: ${title}`);
         if (!title) {
+            console.warn("⚠️ No movie title provided in query.");
             return res.status(400).json({ message: "Movie title is required" });
         }
 
-        console.log(`🔍 Fetching movie details for: ${title}`);
         let movieData = movieCache[title];
         if (!movieData) {
             console.log("Scraping movie data...");
             movieData = await scrapeMovieDetails(title);
             if (!movieData || (!movieData.rottenTomatoes && !movieData.imdb && !movieData.oscars)) {
+                console.warn("⚠️ Movie data not found.");
                 return res.status(404).json({ message: "Movie data not found" });
             }
             movieCache[title] = movieData; // Cache the scraped data
@@ -28,9 +30,10 @@ router.get('/', async (req, res) => {
             console.log("Using cached movie data...");
         }
 
+        console.log("✅ Movie data fetched successfully:", movieData);
         res.json({ movieData });
     } catch (error) {
-        console.error("❌ Error in movie details route:", error);
+        console.error("❌ Error in /api/movies route:", error);
         res.status(500).json({ message: "Error fetching movie details" });
     }
 });

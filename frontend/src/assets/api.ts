@@ -3,6 +3,9 @@ import axios from "axios";
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 export const fetchMovies = async (title: string) => {
+  console.log(`📤 Sending request to /api/movies with title: ${title}`);
+  console.log(`🌐 API_BASE_URL: ${API_BASE_URL}`);
+ 
   try {
     const response = await axios.get(`${API_BASE_URL}/api/movies`, {
       params: { title },
