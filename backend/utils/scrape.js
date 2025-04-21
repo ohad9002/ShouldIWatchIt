@@ -9,7 +9,8 @@ const scrapeMovieDetails = async (movieName, options = { debug: false }) => {
         // Launch Playwright browser
         console.log(`🔍 Using Playwright browser path: ${process.env.PLAYWRIGHT_BROWSERS_PATH || 'default'}`);
         browser = await playwright.chromium.launch({
-            headless: !options.debug,
+            headless: true,
+            args: ['--no-sandbox'], 
             executablePath: process.env.PLAYWRIGHT_BROWSERS_PATH || undefined, // Use the correct browser path
         });
 

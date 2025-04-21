@@ -1,5 +1,5 @@
 # Use an official Node.js image as the base
-FROM mcr.microsoft.com/playwright:v1.38.0-focal
+FROM mcr.microsoft.com/playwright:v1.52.0-noble
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -11,7 +11,7 @@ COPY package*.json ./
 RUN npm install
 
 # Ensure Playwright browser binaries have execution permissions
-RUN chmod -R 755 /ms-playwright
+RUN chmod -R 755 /ms-playwright && ls -l /ms-playwright
 
 # Copy the rest of the application code to the container
 COPY . .
