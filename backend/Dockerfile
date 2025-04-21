@@ -16,6 +16,9 @@ RUN chmod -R 755 /ms-playwright && ls -l /ms-playwright
 # Copy the rest of the application code to the container
 COPY . .
 
+# Ensure the container runs as root
+USER root
+
 # Expose the port your app runs on
 EXPOSE 3000
 
