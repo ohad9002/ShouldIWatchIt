@@ -25,7 +25,10 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
   const { user } = useAuthStore();
   const [movieData, setMovieData] = useState<Movie | null>(null);
   const [query, setQuery] = useState("");
-  const [aiDecision, setAiDecision] = useState<{ decision: string; explanation: string } | null>(null);
+  const [aiDecision, setAiDecision] = useState<{
+    decision: string;
+    explanation: string;
+  } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,7 +55,9 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
     setIsLoading(true);
     try {
       if (!query) {
-        console.warn("⚠️ No query provided. Prompting user to enter a movie title.");
+        console.warn(
+          "⚠️ No query provided. Prompting user to enter a movie title.",
+        );
         setError("Please enter a movie title.");
         return;
       }
@@ -71,7 +76,10 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
       if (user?.token) {
         console.log("🔑 User is logged in. Fetching AI decision...");
         const decisionResponse = await fetchMovieDecision(query, user.token);
-        console.log("📥 AI Decision received from fetchMovieDecision:", decisionResponse);
+        console.log(
+          "📥 AI Decision received from fetchMovieDecision:",
+          decisionResponse,
+        );
 
         setAiDecision({
           decision: decisionResponse.decision,
@@ -83,7 +91,10 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
     } catch (error) {
       console.error("❌ Error during handleSearch:", error);
       if (error instanceof Error) {
-        setError(error.message || "Failed to fetch movie or AI decision. Please try again.");
+        setError(
+          error.message ||
+            "Failed to fetch movie or AI decision. Please try again.",
+        );
       } else {
         setError("Failed to fetch movie or AI decision. Please try again.");
       }
@@ -155,7 +166,9 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
                 <p>{aiDecision.explanation}</p>
               </div>
             )}
-            <h3 className="text-2xl font-bold">{movieData.rottenTomatoes?.title || "Unknown"}</h3>
+            <h3 className="text-2xl font-bold">
+              {movieData.rottenTomatoes?.title || "Unknown"}
+            </h3>
             {movieData.rottenTomatoes?.image ? (
               <img
                 src={movieData.rottenTomatoes.image}
@@ -167,9 +180,12 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
             )}
             <p>IMDb: {movieData.imdb?.rating || "N/A"}</p>
             <p>RT Critics: {movieData.rottenTomatoes?.criticScore || "N/A"}</p>
-            <p>RT Audience: {movieData.rottenTomatoes?.audienceScore || "N/A"}</p>
             <p>
-              <strong>Release Date:</strong> {movieData.rottenTomatoes?.releaseDate || "N/A"}
+              RT Audience: {movieData.rottenTomatoes?.audienceScore || "N/A"}
+            </p>
+            <p>
+              <strong>Release Date:</strong>{" "}
+              {movieData.rottenTomatoes?.releaseDate || "N/A"}
             </p>
             <p>
               <strong>Genres:</strong>{" "}

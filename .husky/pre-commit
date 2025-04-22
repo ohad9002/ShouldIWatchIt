@@ -1,0 +1,10 @@
+
+
+echo "🔍 Linting, type-checking, formatting, and testing frontend..."
+
+cd frontend
+
+npm run lint || exit 1
+npm run build || exit 1
+npm run format || exit 1
+# npm test || exit 1

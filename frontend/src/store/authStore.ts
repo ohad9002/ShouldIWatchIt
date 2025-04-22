@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { jwtDecode } from 'jwt-decode'; // Use named import
+import { create } from "zustand";
+import { jwtDecode } from "jwt-decode"; // Use named import
 
 export type User = {
   userId: string;

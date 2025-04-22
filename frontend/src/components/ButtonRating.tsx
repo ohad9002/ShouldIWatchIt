@@ -13,9 +13,7 @@ const ButtonRating: React.FC<ButtonRatingProps> = ({ value, onChange }) => {
           key={num}
           onClick={() => onChange(num)}
           className={`px-3 py-1 rounded transition-all duration-200 ${
-            num === value
-              ? "button-rating-selected"
-              : "button-rating"
+            num === value ? "button-rating-selected" : "button-rating"
           }`}
         >
           {num}

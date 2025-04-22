@@ -1,11 +1,12 @@
 import axios from "axios";
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 export const fetchMovies = async (title: string) => {
   console.log(`📤 Sending request to /api/movies with title: ${title}`);
   console.log(`🌐 API_BASE_URL: ${API_BASE_URL}`);
- 
+
   try {
     const response = await axios.get(`${API_BASE_URL}/api/movies`, {
       params: { title },
@@ -16,11 +17,15 @@ export const fetchMovies = async (title: string) => {
     const movieData = response.data.movieData;
     if (movieData.oscars && Array.isArray(movieData.oscars)) {
       movieData.oscars = movieData.oscars.map(
-        (oscar: { originalCategory: string; fullCategory: string; isWin: boolean }) => ({
+        (oscar: {
+          originalCategory: string;
+          fullCategory: string;
+          isWin: boolean;
+        }) => ({
           originalCategory: oscar.originalCategory,
           fullCategory: oscar.fullCategory, // Include fullCategory
           isWin: oscar.isWin,
-        })
+        }),
       );
     }
 
@@ -33,24 +38,33 @@ export const fetchMovies = async (title: string) => {
 
 export const fetchMovieDecision = async (title: string, token: string) => {
   try {
-    console.log(`📤 Sending request to /api/movies/decision with title: ${title}`);
+    console.log(
+      `📤 Sending request to /api/movies/decision with title: ${title}`,
+    );
     const response = await axios.get(`${API_BASE_URL}/api/movies/decision`, {
       params: { movie: title }, // Pass the movie title as a query parameter
       headers: {
         Authorization: `Bearer ${token}`, // Include the token in the Authorization header
       },
     });
-    console.log("📥 Received response from /api/movies/decision:", response.data);
+    console.log(
+      "📥 Received response from /api/movies/decision:",
+      response.data,
+    );
 
     // Ensure `fullCategory` is preserved in the Oscars data
     const movieData = response.data.movieData;
     if (movieData.oscars && Array.isArray(movieData.oscars)) {
       movieData.oscars = movieData.oscars.map(
-        (oscar: { originalCategory: string; fullCategory: string; isWin: boolean }) => ({
+        (oscar: {
+          originalCategory: string;
+          fullCategory: string;
+          isWin: boolean;
+        }) => ({
           originalCategory: oscar.originalCategory,
           fullCategory: oscar.fullCategory, // Include fullCategory
           isWin: oscar.isWin,
-        })
+        }),
       );
     }
 

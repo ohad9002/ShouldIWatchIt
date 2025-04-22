@@ -16,15 +16,23 @@ type Oscar = {
 
 const Preferences = () => {
   const { user } = useAuthStore();
-  const [ratings, setRatings] = useState<{ rtCritic: number; rtPopular: number; imdb: number }>({
+  const [ratings, setRatings] = useState<{
+    rtCritic: number;
+    rtPopular: number;
+    imdb: number;
+  }>({
     rtCritic: 5,
     rtPopular: 5,
     imdb: 5,
   });
   const [genres, setGenres] = useState<Genre[]>([]);
-  const [genrePreferences, setGenrePreferences] = useState<Record<string, number>>({});
+  const [genrePreferences, setGenrePreferences] = useState<
+    Record<string, number>
+  >({});
   const [oscars, setOscars] = useState<Oscar[]>([]);
-  const [oscarPreferences, setOscarPreferences] = useState<Record<string, number>>({});
+  const [oscarPreferences, setOscarPreferences] = useState<
+    Record<string, number>
+  >({});
   const [loading, setLoading] = useState(true);
 
   const userId = user?.userId;
@@ -36,19 +44,25 @@ const Preferences = () => {
           throw new Error("No token available");
         }
 
-        const optionsResponse = await axios.get(`${API_BASE_URL}/api/preferences/options`, {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
+        const optionsResponse = await axios.get(
+          `${API_BASE_URL}/api/preferences/options`,
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
           },
-        });
+        );
         setGenres(optionsResponse.data.genres);
         setOscars(optionsResponse.data.oscars);
 
-        const preferencesResponse = await axios.get(`${API_BASE_URL}/api/preferences/${userId}`, {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
+        const preferencesResponse = await axios.get(
+          `${API_BASE_URL}/api/preferences/${userId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
           },
-        });
+        );
         const { ratings, genres, oscars } = preferencesResponse.data;
 
         setRatings(ratings);
@@ -89,7 +103,7 @@ const Preferences = () => {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        }
+        },
       );
 
       await axios.post(
@@ -99,7 +113,7 @@ const Preferences = () => {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        }
+        },
       );
 
       await axios.post(
@@ -109,7 +123,7 @@ const Preferences = () => {
           headers: {
             Authorization: `Bearer ${user.token}`,
           },
-        }
+        },
       );
 
       alert("Preferences saved successfully!");
@@ -132,36 +146,44 @@ const Preferences = () => {
       }}
     >
       <h1
-        className="text-3xl font-bold mb-6"
+        className="text-3xl font-bold mb-6 text-center"
         style={{ color: "var(--primary-color)" }}
       >
         Preferences
       </h1>
-      <p>
+      <p className="mb-6 text-center">
         Please rate from 1 - lowest to 10 - highest, how important it is for you
         that any movie in general will have the following:
       </p>
 
       {/* Ratings Section */}
-      <section className="mb-6">
-        <h2 className="text-2xl font-bold mb-4">Ratings</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label>Rotten Tomatoes (Critic):</label>
+      <section className="mb-8">
+        <h2 className="text-2xl font-bold mb-4 text-center">Ratings</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="flex flex-col items-center">
+            <label className="mb-2 text-center">
+              Rotten Tomatoes (Critic):
+            </label>
             <ButtonRating
               value={ratings.rtCritic}
-              onChange={(value: number) => handleRatingChange("rtCritic", value)}
+              onChange={(value: number) =>
+                handleRatingChange("rtCritic", value)
+              }
             />
           </div>
-          <div>
-            <label>Rotten Tomatoes (Popular):</label>
+          <div className="flex flex-col items-center">
+            <label className="mb-2 text-center">
+              Rotten Tomatoes (Popular):
+            </label>
             <ButtonRating
               value={ratings.rtPopular}
-              onChange={(value: number) => handleRatingChange("rtPopular", value)}
+              onChange={(value: number) =>
+                handleRatingChange("rtPopular", value)
+              }
             />
           </div>
-          <div>
-            <label>IMDB:</label>
+          <div className="flex flex-col items-center">
+            <label className="mb-2 text-center">IMDB:</label>
             <ButtonRating
               value={ratings.imdb}
               onChange={(value: number) => handleRatingChange("imdb", value)}
@@ -171,15 +193,17 @@ const Preferences = () => {
       </section>
 
       {/* Genres Section */}
-      <section className="mb-6">
-        <h2 className="text-2xl font-bold mb-4">Genres</h2>
-        <div className="grid grid-cols-2 gap-4">
+      <section className="mb-8">
+        <h2 className="text-2xl font-bold mb-4 text-center">Genres</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {genres.map((genre) => (
-            <div key={genre._id}>
-              <label>{genre.name}:</label>
+            <div key={genre._id} className="flex flex-col items-center">
+              <label className="mb-2 text-center">{genre.name}:</label>
               <ButtonRating
                 value={genrePreferences[genre._id] || 5}
-                onChange={(value: number) => handleGenreChange(genre._id, value)}
+                onChange={(value: number) =>
+                  handleGenreChange(genre._id, value)
+                }
               />
             </div>
           ))}
@@ -187,27 +211,31 @@ const Preferences = () => {
       </section>
 
       {/* Oscars Section */}
-      <section className="mb-6">
-        <h2 className="text-2xl font-bold mb-4">Oscars</h2>
-        <div className="grid grid-cols-2 gap-4">
+      <section className="mb-8">
+        <h2 className="text-2xl font-bold mb-4 text-center">Oscars</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {oscars.map((oscar) => (
-            <div key={oscar._id}>
-              <label>{oscar.name}:</label>
+            <div key={oscar._id} className="flex flex-col items-center">
+              <label className="mb-2 text-center">{oscar.name}:</label>
               <ButtonRating
                 value={oscarPreferences[oscar._id] || 5}
-                onChange={(value: number) => handleOscarChange(oscar._id, value)}
+                onChange={(value: number) =>
+                  handleOscarChange(oscar._id, value)
+                }
               />
             </div>
           ))}
         </div>
       </section>
 
-      <button
-        onClick={handleSubmit}
-        className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-700 transition"
-      >
-        Save Preferences
-      </button>
+      <div className="flex justify-center">
+        <button
+          onClick={handleSubmit}
+          className="bg-red-500 text-white px-6 py-3 rounded hover:bg-red-700 transition"
+        >
+          Save Preferences
+        </button>
+      </div>
     </div>
   );
 };
