@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
     "check": "npm run lint && npm run typecheck",
-    "prepare": "husky install",
+      "prepare": "test -d .git && husky install || echo 'Skipping husky install (no .git)'",
     "format": "prettier --write ."
   },
   "dependencies": {
