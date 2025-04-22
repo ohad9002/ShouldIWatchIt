@@ -10,8 +10,8 @@ COPY package*.json ./
 # Install dependencies (including Playwright)
 RUN npm install
 
-# Ensure Playwright browser binaries have execution permissions
-RUN chmod -R 755 /ms-playwright && ls -l /ms-playwright
+# Fix permissions on browser binaries
+RUN find /ms-playwright -type f -exec chmod +x {} \;
 
 # Copy the rest of the application code to the container
 COPY . .
