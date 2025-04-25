@@ -2,6 +2,34 @@ const { normalizeGenre, normalizeOscarCategory } = require('../utils/normalizati
 const { calculateSimilarity } = require('../utils/similarity');
 const playwright = require('playwright');
 
+/**
+ * Retry a function with exponential backoff and optional jitter.
+ * @param {Function} fn - The async function to retry.
+ * @param {Object} options - Retry settings.
+ * @param {number} [options.retries=3] - Max number of attempts.
+ * @param {number} [options.delay=2000] - Initial delay between attempts (ms).
+ * @param {boolean} [options.jitter=true] - Whether to apply jitter (random variation).
+ * @returns {Promise<any>} - Result of the successful function call.
+ */
+const retry = async (fn, { retries = 3, delay = 2000, jitter = true } = {}) => {
+    let attempt = 0;
+    while (attempt < retries) {
+        try {
+            return await fn();
+        } catch (err) {
+            attempt++;
+            if (attempt >= retries) throw err;
+
+            const backoff = delay * Math.pow(2, attempt - 1); // exponential
+            const jitterAmount = jitter ? Math.random() * 0.4 * backoff : 0;
+            const finalDelay = backoff + jitterAmount;
+
+            console.warn(`🔁 Retry ${attempt}/${retries}: ${err.message}. Retrying in ${Math.round(finalDelay)}ms...`);
+            await new Promise(res => setTimeout(res, finalDelay));
+        }
+    }
+};
+
 const scrapeMovieDetails = async (movieName, options = {}) => {
     const browser = await playwright.chromium.launch({ headless: !options.debug });
     const imdbContext = await browser.newContext();
@@ -100,47 +128,57 @@ const scrapeMovieDetails = async (movieName, options = {}) => {
         console.error('❌ Error scraping Rotten Tomatoes:', error);
     }
 
-    /** ========================== Oscars Database ========================== **/
-    try {
-        console.log('📌 Navigating to Oscars Database...');
-        await rtPage.goto(`https://awardsdatabase.oscars.org/`, {
-            timeout: 15000,
-            waitUntil: 'domcontentloaded'
-        });
+   /** ========================== Oscars Database ========================== **/
+try {
+    console.log('📌 Navigating to Oscars Database...');
+    await retry(() =>
+        rtPage.goto(`https://awardsdatabase.oscars.org/`, { timeout: 15000, waitUntil: 'domcontentloaded' })
+    );
 
-        console.log('🔎 Searching for Oscars data...');
-        const searchBox = await rtPage.waitForSelector('#BasicSearchView_FilmTitle', { timeout: 10000 }).catch(() => null);
+    console.log('🔎 Searching for Oscars data...');
+    const searchBox = await retry(() =>
+        rtPage.waitForSelector('#BasicSearchView_FilmTitle', { timeout: 10000 })
+    ).catch(() => null);
 
-        if (searchBox) {
-            const movieTitle = movieData.imdb?.title || movieData.rottentomatoes?.title || movieName;
-            console.log(`🔍 Using movie title for Oscars search: "${movieTitle}"`);
-            await searchBox.fill(movieTitle);
-            await rtPage.click('button[type="submit"]');
-            await rtPage.waitForTimeout(5000);
+    if (searchBox) {
+        const movieTitle = movieData.imdb?.title || movieData.rottentomatoes?.title || movieName;
+        console.log(`🔍 Using movie title for Oscars search: "${movieTitle}"`);
+        await retry(() => searchBox.fill(movieTitle));
+        await rtPage.click('button[type="submit"]');
+        await rtPage.waitForTimeout(5000);
 
-            const resultsContainer = await rtPage.$('#resultscontainer');
-            if (resultsContainer) {
-                const movieSections = await resultsContainer.$$('.result-group-title a.nominations-link');
-                const normalizeText = (text) => text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-                const normalizedQuery = normalizeText(movieTitle);
+        console.log('🔎 Checking for Oscars search results...');
+        const resultsContainer = await rtPage.$('#resultscontainer');
 
-                const matchedSection = await movieSections.reduce(async (bestMatchPromise, section) => {
-                    const bestMatch = await bestMatchPromise;
-                    const sectionTitle = await section.evaluate((el) => el.innerText.trim());
-                    const normalizedTitle = normalizeText(sectionTitle);
-                    const similarity = calculateSimilarity(normalizedQuery, normalizedTitle);
+        if (resultsContainer) {
+            const movieSections = await resultsContainer.$$('.result-group-title a.nominations-link');
+            let matchedSection = null;
 
-                    if (similarity > bestMatch.similarity) {
-                        return { section, similarity };
-                    }
-                    return bestMatch;
-                }, Promise.resolve({ section: null, similarity: 0 }));
+            const normalizeText = (text) => text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+            const normalizedQuery = normalizeText(movieTitle);
+            console.log(`🔍 Evaluating results for query: "${movieTitle}"`);
 
-                if (matchedSection.section) {
-                    await matchedSection.section.click();
-                    await rtPage.waitForTimeout(3000);
+            matchedSection = await movieSections.reduce(async (bestMatchPromise, section) => {
+                const bestMatch = await bestMatchPromise;
+                const sectionTitle = await section.evaluate((el) => el.innerText.trim());
+                const normalizedTitle = normalizeText(sectionTitle);
+                const similarity = calculateSimilarity(normalizedQuery, normalizedTitle);
+                console.log(`   🔹 Similarity score for "${sectionTitle}": ${similarity}`);
 
-                    const awards = await rtPage.evaluate(() => {
+                if (similarity > bestMatch.similarity) {
+                    return { section, similarity };
+                }
+
+                return bestMatch;
+            }, Promise.resolve({ section: null, similarity: 0 }));
+
+            if (matchedSection.section) {
+                console.log(`✅ Found matching section for movie: "${movieTitle}"`);
+                await retry(() => matchedSection.section.click());
+                await rtPage.waitForTimeout(3000);
+
+                const awards = await retry(() =>
+                    rtPage.evaluate(() => {
                         const awardsData = [];
                         const awardRows = document.querySelectorAll('.result-details');
 
@@ -163,6 +201,7 @@ const scrapeMovieDetails = async (movieName, options = {}) => {
                             }
 
                             const fullCategory = descriptionParts.join(' ');
+
                             if (categoryElement) {
                                 awardsData.push({
                                     originalCategory: categoryElement.innerText.trim(),
@@ -173,48 +212,50 @@ const scrapeMovieDetails = async (movieName, options = {}) => {
                         });
 
                         return awardsData;
-                    });
+                    })
+                );
 
-                    movieData.oscars = awards.map((award) => ({
-                        ...award,
-                        normalizedCategory: normalizeOscarCategory(award.originalCategory)
-                    }));
-                    console.log('🏆 Oscars data extracted:', movieData.oscars);
-                } else {
-                    console.log(`⚠️ No matching section found for movie: "${movieTitle}"`);
-                    movieData.oscars = [];
-                }
+                movieData.oscars = awards.map((award) => ({
+                    ...award,
+                    normalizedCategory: normalizeOscarCategory(award.originalCategory)
+                }));
+
+                console.log('🏆 Oscars data extracted:', movieData.oscars);
             } else {
-                console.log('⚠️ Oscars: No results found.');
+                console.log(`⚠️ No matching section found for movie: "${movieTitle}"`);
                 movieData.oscars = [];
             }
-        }
-    } catch (error) {
-        console.error('❌ Error scraping Oscars:', error);
-        movieData.oscars = [];
-    } finally {
-        if (browser) {
-            await browser.close();
+        } else {
+            console.log('⚠️ Oscars: No results found.');
+            movieData.oscars = [];
         }
     }
-
-    console.log('✅ Scraping completed. Movie data:', movieData);
-    if (options.debug) {
-        console.log('🔍 Debugging mode: Browser will remain open.');
-    } else {
-        await rtContext.close();
-        await imdbContext.close();
+} catch (error) {
+    console.error('❌ Error scraping Oscars:', error);
+    movieData.oscars = [];
+} finally {
+    if (browser) {
+        await browser.close();
     }
+}
 
-    /** ========================== Combined Normalized Genres ========================== **/
-    movieData.genres = [
-        ...(movieData.imdb?.genres || []),
-        ...(movieData.rottentomatoes?.genres || [])
-    ]
+console.log('✅ Scraping completed. Movie data:', movieData);
+if (options.debug) {
+    console.log('🔍 Debugging mode: Browser will remain open.');
+} else {
+    await rtContext.close();
+    await imdbContext.close();
+}
+
+/** ========================== Combined Normalized Genres ========================== **/
+movieData.genres = [
+    ...(movieData.imdb?.genres || []),
+    ...(movieData.rottentomatoes?.genres || [])
+]
     .flatMap(g => normalizeGenre(g).split(',').map(g => g.trim()))
     .filter((g, index, self) => g && self.indexOf(g) === index); // Remove duplicates
 
-    return movieData;
+return movieData;
 };
 
 module.exports = { scrapeMovieDetails };
