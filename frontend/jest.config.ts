@@ -1,19 +1,17 @@
 // frontend/jest.config.ts
 
-import type { Config } from 'jest';
+import type { Config } from "jest";
 
 const config: Config = {
-  preset: 'ts-jest',
-  testEnvironment: 'jsdom',
+  preset: "ts-jest",
+  testEnvironment: "jsdom",
   moduleNameMapper: {
-    "\\.(css|less|sass|scss)$": "identity-obj-proxy"
+    "\\.(css|less|sass|scss)$": "identity-obj-proxy",
   },
   transform: {
-    "^.+\\.(ts|tsx)$": "ts-jest"
+    "^.+\\.(ts|tsx)$": "ts-jest",
   },
-  setupFilesAfterEnv: [
-    "@testing-library/jest-dom/extend-expect"
-  ]
+  setupFilesAfterEnv: ["@testing-library/jest-dom/extend-expect"],
 };
 
 export default config;
