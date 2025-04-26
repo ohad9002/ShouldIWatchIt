@@ -1,4 +1,4 @@
-name: Backend Tests and Deployments
+name: Backend & Frontend Tests and Deployments
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   test-backend:
+    name: 🛠 Backend Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -22,17 +23,40 @@ jobs:
         with:
           node-version: "20"
 
-      - name: 📦 Install dependencies
+      - name: 📦 Install backend dependencies
         run: npm ci
 
-      - name: ✅ Run tests
+      - name: ✅ Run backend tests
         run: npm run test
 
-      - name: 📊 Generate coverage report
+      - name: 📊 Generate backend coverage report
         run: npm run test:coverage
 
+  test-frontend:
+    name: 🖼 Frontend Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: ⬇️ Checkout code
+        uses: actions/checkout@v3
+
+      - name: ⚙️ Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: 📦 Install frontend dependencies
+        run: npm ci
+
+      - name: ✅ Run frontend tests
+        run: npm run test
+
   deploy-backend:
-    needs: test-backend
+    name: 🚀 Deploy Backend
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     if: success() && github.ref == 'refs/heads/main'
 
@@ -43,7 +67,8 @@ jobs:
           RENDER_BACKEND_DEPLOY_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
 
   deploy-frontend:
-    needs: test-backend
+    name: 🚀 Deploy Frontend
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     if: success() && github.ref == 'refs/heads/main'
 

@@ -20,7 +20,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    "noUncheckedSideEffectImports": true,
+
+    /* 👇 ADD this line */
+    "types": ["jest", "node"]
   },
-  "include": ["src"]
+  /* 👇 MODIFY this line */
+  "include": ["src", "**/*.test.tsx", "**/*.test.ts"]
 }
