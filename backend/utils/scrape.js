@@ -1,261 +1,70 @@
-const { normalizeGenre, normalizeOscarCategory } = require('../utils/normalization');
-const { calculateSimilarity } = require('../utils/similarity');
-const playwright = require('playwright');
+// backend/utils/scrape.js
 
-/**
- * Retry a function with exponential backoff and optional jitter.
- * @param {Function} fn - The async function to retry.
- * @param {Object} options - Retry settings.
- * @param {number} [options.retries=3] - Max number of attempts.
- * @param {number} [options.delay=2000] - Initial delay between attempts (ms).
- * @param {boolean} [options.jitter=true] - Whether to apply jitter (random variation).
- * @returns {Promise<any>} - Result of the successful function call.
- */
-const retry = async (fn, { retries = 3, delay = 2000, jitter = true } = {}) => {
-    let attempt = 0;
-    while (attempt < retries) {
-        try {
-            return await fn();
-        } catch (err) {
-            attempt++;
-            if (attempt >= retries) throw err;
+const { chromium }   = require('playwright');
+const { scrapeRT }   = require('./scrapers/scrapeRT');
+const { scrapeIMDb } = require('./scrapers/scrapeIMDb');
+const { scrapeOscars } = require('./scrapers/scrapeOscars');
+const { normalizeGenre } = require('./normalization');  // <-- verify this path + name!
 
-            const backoff = delay * Math.pow(2, attempt - 1); // exponential
-            const jitterAmount = jitter ? Math.random() * 0.4 * backoff : 0;
-            const finalDelay = backoff + jitterAmount;
+async function scrapeMovieDetails(movieTitle) {
+  console.log(`🔍 Starting scrape for: "${movieTitle}"`);
+  const movieData = { imdb: null, rottenTomatoes: null, oscars: null, genres: [] };
 
-            console.warn(`🔁 Retry ${attempt}/${retries}: ${err.message}. Retrying in ${Math.round(finalDelay)}ms...`);
-            await new Promise(res => setTimeout(res, finalDelay));
-        }
-    }
-};
+  let browser, context;
+  try {
+    console.log("📌 Launching browser…");
+    browser = await chromium.launch({ headless: true, slowMo: 50 });
+    console.log("📌 Browser instance initialized");
 
-const scrapeMovieDetails = async (movieName, options = {}) => {
-    const browser = await playwright.chromium.launch({ headless: !options.debug });
-    const imdbContext = await browser.newContext();
-    const rtContext = await browser.newContext();
-    const imdbPage = await imdbContext.newPage();
-    const rtPage = await rtContext.newPage();
+    context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)…',
+      locale: 'en-US',
+      extraHTTPHeaders: { 'accept-language': 'en-US,en;q=0.9' }
+    });
 
-    const movieData = {
-        imdb: null,
-        rottentomatoes: null,
-        oscars: [],
-    };
+    console.log("📌 Creating pages for RT and IMDb…");
+    const [ rtPage, imdbPage ] = await Promise.all([
+      context.newPage(),
+      context.newPage()
+    ]);
 
-    /** ========================== IMDb Scraping ========================== **/
-    try {
-        console.log('🌐 Navigating to IMDb...');
-        await imdbPage.goto(`https://www.imdb.com/find?q=${encodeURIComponent(movieName)}`, {
-            timeout: 15000,
-            waitUntil: 'domcontentloaded'
-        });
+    console.log("📌 Scraping Rotten Tomatoes and IMDb…");
+    const [ rtData, imdbData ] = await Promise.all([
+      scrapeRT(rtPage, movieTitle),
+      scrapeIMDb(imdbPage, movieTitle)
+    ]);
 
-        const firstResult = await imdbPage.$('.findResult .result_text a');
-        if (firstResult) {
-            const movieUrl = await firstResult.getAttribute('href');
-            const fullUrl = `https://www.imdb.com${movieUrl}`;
-            await imdbPage.goto(fullUrl, { timeout: 15000, waitUntil: 'domcontentloaded' });
+    movieData.rottenTomatoes = rtData;
+    movieData.imdb = imdbData;
 
-            const imdbTitle = await imdbPage.title();
-            const ratingElement = await imdbPage.$('span[itemprop="ratingValue"]');
-            const genreElements = await imdbPage.$$('div[data-testid="genres"] a');
-            const posterElement = await imdbPage.$('.ipc-image');
-
-            const rating = ratingElement ? parseFloat(await ratingElement.innerText()) : null;
-            const genres = genreElements ? await Promise.all(genreElements.map(el => el.innerText())) : [];
-
-            const posterUrl = posterElement ? await posterElement.getAttribute('src') : null;
-
-            movieData.imdb = {
-                title: imdbTitle,
-                rating,
-                genres,
-                image: posterUrl
-            };
-        } else {
-            console.log('⚠️ IMDb: No results found.');
-        }
-    } catch (error) {
-        console.error('❌ Error scraping IMDb:', error);
+    if (imdbData?.title) {
+      console.log("📌 Scraping Oscars with title:", imdbData.title);
+      const oscarsPage = await context.newPage();
+      movieData.oscars = await scrapeOscars(oscarsPage, imdbData.title);
+      await oscarsPage.close();
     }
 
-    /** ========================== Rotten Tomatoes Scraping ========================== **/
-    try {
-        console.log('🍅 Navigating to Rotten Tomatoes...');
-        await rtPage.goto(`https://www.rottentomatoes.com/search?search=${encodeURIComponent(movieName)}`, {
-            timeout: 15000,
-            waitUntil: 'domcontentloaded'
-        });
+    console.log("📌 Normalizing & merging genres…");
+    const rawGenres = [
+      ...(imdbData?.genres || []),
+      ...(rtData?.genres || [])
+    ];
+    movieData.genres = Array.from(new Set(
+      rawGenres
+        .flatMap(g => normalizeGenre(g).split(','))
+        .map(s => s.trim())
+        .filter(Boolean)
+    ));
 
-        const movieLink = await rtPage.$('.search-page-media-row a');
-        if (movieLink) {
-            const href = await movieLink.getAttribute('href');
-            const movieUrl = `https://www.rottentomatoes.com${href}`;
-            await rtPage.goto(movieUrl, { timeout: 15000, waitUntil: 'domcontentloaded' });
+  } catch (err) {
+    console.error('❌ Overall scraping failed:', err);
+  } finally {
+    if (context) await context.close();
+    if (browser) await browser.close();
+  }
 
-            const rtTitle = await rtPage.title();
-
-            const criticScoreElement = await rtPage.$('score-board');
-            const audienceScoreElement = await rtPage.$('score-board');
-
-            const criticScore = criticScoreElement
-                ? parseFloat(await criticScoreElement.getAttribute('tomatometerscore'))
-                : null;
-            const audienceScore = audienceScoreElement
-                ? parseFloat(await audienceScoreElement.getAttribute('audiencescore'))
-                : null;
-
-            const genreSpans = await rtPage.$$('ul.content-meta.info li.meta-row span[data-qa="movie-info-item-value"]');
-            const genres = genreSpans
-                ? await Promise.all(genreSpans.map(el => el.innerText()))
-                : [];
-
-            const posterElement = await rtPage.$('img.posterImage');
-            const posterUrl = posterElement ? await posterElement.getAttribute('src') : null;
-
-            movieData.rottentomatoes = {
-                title: rtTitle,
-                criticScore,
-                audienceScore,
-                genres,
-                image: posterUrl
-            };
-        } else {
-            console.log('⚠️ Rotten Tomatoes: No results found.');
-        }
-    } catch (error) {
-        console.error('❌ Error scraping Rotten Tomatoes:', error);
-    }
-
-   /** ========================== Oscars Database ========================== **/
-try {
-    console.log('📌 Navigating to Oscars Database...');
-    await retry(() =>
-        rtPage.goto(`https://awardsdatabase.oscars.org/`, { timeout: 15000, waitUntil: 'domcontentloaded' })
-    );
-
-    console.log('🔎 Searching for Oscars data...');
-    const searchBox = await retry(() =>
-        rtPage.waitForSelector('#BasicSearchView_FilmTitle', { timeout: 10000 })
-    ).catch(() => null);
-
-    if (searchBox) {
-        const movieTitle = movieData.imdb?.title || movieData.rottentomatoes?.title || movieName;
-        console.log(`🔍 Using movie title for Oscars search: "${movieTitle}"`);
-        await retry(() => searchBox.fill(movieTitle));
-        await rtPage.click('button[type="submit"]');
-        await rtPage.waitForTimeout(5000);
-
-        console.log('🔎 Checking for Oscars search results...');
-        const resultsContainer = await rtPage.$('#resultscontainer');
-
-        if (resultsContainer) {
-            const movieSections = await resultsContainer.$$('.result-group-title a.nominations-link');
-            let matchedSection = null;
-
-            const normalizeText = (text) => text.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
-            const normalizedQuery = normalizeText(movieTitle);
-            console.log(`🔍 Evaluating results for query: "${movieTitle}"`);
-
-            matchedSection = await movieSections.reduce(async (bestMatchPromise, section) => {
-                const bestMatch = await bestMatchPromise;
-                const sectionTitle = await section.evaluate((el) => el.innerText.trim());
-                const normalizedTitle = normalizeText(sectionTitle);
-                const similarity = calculateSimilarity(normalizedQuery, normalizedTitle);
-                console.log(`   🔹 Similarity score for "${sectionTitle}": ${similarity}`);
-
-                if (similarity > bestMatch.similarity) {
-                    return { section, similarity };
-                }
-
-                return bestMatch;
-            }, Promise.resolve({ section: null, similarity: 0 }));
-
-            if (matchedSection.section) {
-                console.log(`✅ Found matching section for movie: "${movieTitle}"`);
-                await retry(() => matchedSection.section.click());
-                await rtPage.waitForTimeout(3000);
-
-                const awards = await retry(() =>
-                    rtPage.evaluate(() => {
-                        const awardsData = [];
-                        const awardRows = document.querySelectorAll('.result-details');
-
-                        awardRows.forEach((row) => {
-                            const categoryElement = row.querySelector('.awards-result-awardcategory-exact a');
-                            const nomineeElement = row.querySelector('.awards-result-nominationstatement a');
-                            const songTitleElement = row.querySelector('.awards-result-songtitle');
-                            const characterElement = row.querySelector('.awards-result-character-name');
-                            const publicNoteElement = row.querySelector('.awards-result-publicnote');
-                            const isWin = row.querySelector('.glyphicon-star') !== null;
-
-                            const descriptionParts = [];
-                            if (categoryElement) descriptionParts.push(categoryElement.innerText.trim());
-                            if (songTitleElement) descriptionParts.push(`"${songTitleElement.innerText.trim()}"`);
-                            if (nomineeElement) descriptionParts.push(`-- ${nomineeElement.innerText.trim()}`);
-                            if (characterElement) descriptionParts.push(`{"${characterElement.innerText.trim()}"}`);
-                            if (publicNoteElement) {
-                                const note = publicNoteElement.innerText.trim().replace(/\[NOTE: \[NOTE: /g, "[NOTE: ");
-                                descriptionParts.push(`[NOTE: ${note}]`);
-                            }
-
-                            const fullCategory = descriptionParts.join(' ');
-
-                            if (categoryElement) {
-                                awardsData.push({
-                                    originalCategory: categoryElement.innerText.trim(),
-                                    fullCategory,
-                                    isWin
-                                });
-                            }
-                        });
-
-                        return awardsData;
-                    })
-                );
-
-                movieData.oscars = awards.map((award) => ({
-                    ...award,
-                    normalizedCategory: normalizeOscarCategory(award.originalCategory)
-                }));
-
-                console.log('🏆 Oscars data extracted:', movieData.oscars);
-            } else {
-                console.log(`⚠️ No matching section found for movie: "${movieTitle}"`);
-                movieData.oscars = [];
-            }
-        } else {
-            console.log('⚠️ Oscars: No results found.');
-            movieData.oscars = [];
-        }
-    }
-} catch (error) {
-    console.error('❌ Error scraping Oscars:', error);
-    movieData.oscars = [];
-} finally {
-    if (browser) {
-        await browser.close();
-    }
+  console.log('✅ Scraping finished:', movieData);
+  return movieData;
 }
-
-console.log('✅ Scraping completed. Movie data:', movieData);
-if (options.debug) {
-    console.log('🔍 Debugging mode: Browser will remain open.');
-} else {
-    await rtContext.close();
-    await imdbContext.close();
-}
-
-/** ========================== Combined Normalized Genres ========================== **/
-movieData.genres = [
-    ...(movieData.imdb?.genres || []),
-    ...(movieData.rottentomatoes?.genres || [])
-]
-    .flatMap(g => normalizeGenre(g).split(',').map(g => g.trim()))
-    .filter((g, index, self) => g && self.indexOf(g) === index); // Remove duplicates
-
-return movieData;
-};
 
 module.exports = { scrapeMovieDetails };

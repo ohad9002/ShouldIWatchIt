@@ -1,6 +1,6 @@
 const { normalizeOscarCategory } = require("./normalization");
 
-function calculateOscarScore(movieOscars, oscarPrefMap, oscarWeightPercent) {
+function calculateOscarScore(movieOscars, oscarPrefMap, maxScore = 10) {
     if (!Array.isArray(movieOscars) || movieOscars.length === 0) return 0;
 
     const contributions = {};
@@ -20,8 +20,8 @@ function calculateOscarScore(movieOscars, oscarPrefMap, oscarWeightPercent) {
         totalPref += basePref;
     }
 
-    const normalized = totalPref > 0 ? (score / totalPref) * 100 : 0;
-    return (normalized * oscarWeightPercent) / 100;
+    const normalized = totalPref > 0 ? Math.min((score / totalPref) * maxScore, maxScore) : 0;
+    return normalized / maxScore;
 }
 
 module.exports = { calculateOscarScore };

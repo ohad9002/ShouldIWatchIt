@@ -193,7 +193,7 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
                 ? movieData.rottenTomatoes.genres.join(", ")
                 : "N/A"}
             </p>
-            {movieData.oscars.length > 0 ? (
+            {movieData?.oscars && movieData.oscars.length > 0 ? (
               <div>
                 <h4 className="text-xl font-bold mt-4">Oscar Awards</h4>
                 <ul>

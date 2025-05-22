@@ -1,6 +1,8 @@
 const RatingPreference = require("../models/RatingPreference");
 const GenrePreference = require("../models/GenrePreference");
 const OscarPreference = require("../models/OscarPreference");
+const Genre = require("../models/Genre");
+const Oscar = require("../models/Oscar");
 const { generateMovieDecision } = require("../utils/geminiAI");
 const { calculateGenreScore } = require("../utils/genreScoring");
 const { calculateOscarScore } = require("../utils/oscarScoring");
@@ -9,71 +11,124 @@ async function getMovieDecision(userId, movieData) {
     console.log("📌 Movie data before AI decision:", JSON.stringify(movieData, null, 2));
 
     try {
-        // === Rating Preferences ===
+        // === Fetch All Preferences ===
         const ratingPrefs = await RatingPreference.findOne({ user: userId });
         const imdbPref = ratingPrefs?.imdb || 5;
         const rtCriticPref = ratingPrefs?.rtCritic || 5;
         const rtAudiencePref = ratingPrefs?.rtPopular || 5;
-        const avgRatingPref = (imdbPref + rtCriticPref + rtAudiencePref) / 3;
 
-        // === Genre Preferences ===
+        // Fetch all genres and user genre prefs
+        const allGenres = await Genre.find();
         const genrePrefs = await GenrePreference.find({ user: userId }).populate("genre") || [];
-        const genreWeights = {};
+        const genrePrefMap = {};
         genrePrefs.forEach(pref => {
-            if (pref.genre?.name) genreWeights[pref.genre.name] = pref.preference || 5;
+            if (pref.genre?.name) genrePrefMap[pref.genre.name] = pref.preference || 5;
+        });
+        // Fill in missing genres with neutral value
+        allGenres.forEach(g => {
+            if (!(g.name in genrePrefMap)) genrePrefMap[g.name] = 5;
         });
 
-        const matchedGenrePrefs = movieData.genres?.map(g => genreWeights[g]).filter(Boolean) || [];
-        const avgGenrePref = matchedGenrePrefs.length > 0
-            ? matchedGenrePrefs.reduce((sum, val) => sum + val, 0) / matchedGenrePrefs.length
-            : 5;
-
-        // === Oscar Preferences ===
+        // Fetch all oscars and user oscar prefs
+        const allOscars = await Oscar.find();
         const oscarPrefs = await OscarPreference.find({ user: userId }).populate("category") || [];
         const oscarPrefMap = {};
         oscarPrefs.forEach(pref => {
             if (pref.category?.name) oscarPrefMap[pref.category.name] = pref.preference || 5;
         });
+        // Fill in missing oscar categories with neutral value
+        allOscars.forEach(o => {
+            if (!(o.name in oscarPrefMap)) oscarPrefMap[o.name] = 5;
+        });
 
-        const avgOscarPref = oscarPrefs.length > 0
-            ? oscarPrefs.reduce((sum, pref) => sum + (pref.preference || 5), 0) / oscarPrefs.length
-            : 5;
+        // === LOG: User Preferences ===
+        console.log("🔎 User Preferences for Calculation:");
+        console.log(`   - IMDb: ${imdbPref}`);
+        console.log(`   - RT Critic: ${rtCriticPref}`);
+        console.log(`   - RT Audience: ${rtAudiencePref}`);
+        console.log(`   - Genre Prefs:`, genrePrefMap);
+        console.log(`   - Oscar Prefs:`, oscarPrefMap);
 
-        // === Stage 1: Weight Distribution ===
+        // === Stage 1: Calculate Section Weights (using ALL preferences in DB) ===
+        const avgRatingPref = (imdbPref + rtCriticPref + rtAudiencePref) / 3;
+        const avgGenrePref = Object.values(genrePrefMap).reduce((a, b) => a + b, 0) / Object.values(genrePrefMap).length;
+        const avgOscarPref = Object.values(oscarPrefMap).reduce((a, b) => a + b, 0) / Object.values(oscarPrefMap).length;
         const totalWeight = avgRatingPref + avgGenrePref + avgOscarPref;
-        const ratingWeight = (avgRatingPref / totalWeight) * 100;
-        const genreWeight = (avgGenrePref / totalWeight) * 100;
-        const oscarWeight = (avgOscarPref / totalWeight) * 100;
 
-        console.log(`📊 Stage 1 Weights - Ratings: ${ratingWeight.toFixed(2)}%, Genres: ${genreWeight.toFixed(2)}%, Oscars: ${oscarWeight.toFixed(2)}%`);
+        const ratingWeight = avgRatingPref / totalWeight;
+        const genreWeight = avgGenrePref / totalWeight;
+        const oscarWeight = avgOscarPref / totalWeight;
 
-        // === Rating Zone ===
+        console.log(`📊 Stage 1 Weights Calculation:`);
+        console.log(`   - avgRatingPref: ${avgRatingPref.toFixed(2)}`);
+        console.log(`   - avgGenrePref: ${avgGenrePref.toFixed(2)}`);
+        console.log(`   - avgOscarPref: ${avgOscarPref.toFixed(2)}`);
+        console.log(`   - totalWeight: ${totalWeight.toFixed(2)}`);
+        console.log(`   - ratingWeight: ${(ratingWeight * 100).toFixed(2)}%`);
+        console.log(`   - genreWeight: ${(genreWeight * 100).toFixed(2)}%`);
+        console.log(`   - oscarWeight: ${(oscarWeight * 100).toFixed(2)}%`);
+
+        // === Stage 2: Calculate Section Scores (using only relevant preferences + bonuses) ===
+
+        // Ratings
         const imdbRating = parseFloat(movieData.imdb?.rating) || 0;
         const criticScore = parseFloat(movieData.rottenTomatoes?.criticScore?.replace("%", "")) || 0;
         const audienceScore = parseFloat(movieData.rottenTomatoes?.audienceScore?.replace("%", "")) || 0;
 
-        const normIMDb = (imdbRating / 10) * 100;
-        const imdbWeighted = (imdbPref / 10) * normIMDb;
-        const criticWeighted = (rtCriticPref / 10) * criticScore;
-        const audienceWeighted = (rtAudiencePref / 10) * audienceScore;
+        console.log("🔎 Movie Ratings Data:");
+        console.log(`   - IMDb rating: ${imdbRating}`);
+        console.log(`   - RT Critic: ${criticScore}`);
+        console.log(`   - RT Audience: ${audienceScore}`);
 
-        const ratingSlicePerSource = ratingWeight / 3;
-        const weightedRatingScore =
-            (imdbWeighted * ratingSlicePerSource) / 100 +
-            (criticWeighted * ratingSlicePerSource) / 100 +
-            (audienceWeighted * ratingSlicePerSource) / 100;
+        const imdbNorm = imdbRating; // already 0-10
+        const criticNorm = criticScore / 10; // 0-10
+        const audienceNorm = audienceScore / 10; // 0-10
 
-        // === Genre Zone ===
-        const weightedGenreScore = calculateGenreScore(movieData.genres, genreWeights, genreWeight);
+        const totalPref = imdbPref + rtCriticPref + rtAudiencePref;
+        const weightedSum =
+            imdbNorm * imdbPref +
+            criticNorm * rtCriticPref +
+            audienceNorm * rtAudiencePref;
 
-        // === Oscar Zone ===
-        const weightedOscarScore = calculateOscarScore(movieData.oscars, oscarPrefMap, oscarWeight);
+        const rawRatingScore = weightedSum / totalPref; // 0-10
 
-        // === Final Score ===
+        console.log("🔎 Ratings Calculation Details:");
+        console.log(`   - imdbNorm: ${imdbNorm.toFixed(2)}`);
+        console.log(`   - criticNorm: ${criticNorm.toFixed(2)}`);
+        console.log(`   - audienceNorm: ${audienceNorm.toFixed(2)}`);
+        console.log(`   - totalPref: ${totalPref.toFixed(2)}`);
+        console.log(`   - weightedSum: ${weightedSum.toFixed(2)}`);
+        console.log(`   - rawRatingScore (0-10): ${rawRatingScore.toFixed(2)}`);
+
+        // Genres
+        const genreList =
+          movieData.genres && movieData.genres.length
+            ? movieData.genres
+            : movieData.rottenTomatoes?.genres || [];
+        console.log("🔎 Movie Genres:", genreList);
+        const genreScore = calculateGenreScore(genreList, genrePrefMap, 10); // 0-1
+        console.log(`   - genreScore (0-1): ${genreScore.toFixed(3)}`);
+
+        // Oscars
+        console.log("🔎 Movie Oscars:", movieData.oscars);
+        const oscarScore = calculateOscarScore(movieData.oscars, oscarPrefMap, 10); // 0-1
+        console.log(`   - oscarScore (0-1): ${oscarScore.toFixed(3)}`);
+
+        // === Final Score Calculation ===
+        // Ratings (0-10) * weight * 10 = 0-100 * weight
+        const weightedRatingScore = rawRatingScore * ratingWeight * 10;
+        // Genres (0-1) * weight * 100 = 0-100 * weight
+        const weightedGenreScore = genreScore * genreWeight * 100;
+        // Oscars (0-1) * weight * 100 = 0-100 * weight
+        const weightedOscarScore = oscarScore * oscarWeight * 100;
+
         let finalScore = weightedRatingScore + weightedGenreScore + weightedOscarScore;
         finalScore = Math.min(finalScore, 100);
 
-        console.log(`📊 Final Score Breakdown: Ratings: ${weightedRatingScore.toFixed(2)}, Genres: ${weightedGenreScore.toFixed(2)}, Oscars: ${weightedOscarScore.toFixed(2)}`);
+        console.log(`📊 Final Score Breakdown:`);
+        console.log(`   - weightedRatingScore: ${weightedRatingScore.toFixed(2)}`);
+        console.log(`   - weightedGenreScore: ${weightedGenreScore.toFixed(2)}`);
+        console.log(`   - weightedOscarScore: ${weightedOscarScore.toFixed(2)}`);
         console.log(`✅ Final Score (Capped at 100): ${finalScore.toFixed(2)}`);
 
         const formattedPrefs = {

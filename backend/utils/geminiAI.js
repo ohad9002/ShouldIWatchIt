@@ -7,9 +7,29 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 async function generateMovieDecision(movieData, userPrefs, finalScore) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const shouldWatch = finalScore >= 37 ? "Yes" : "No";
+    const shouldWatch = finalScore >= 51 ? "Yes" : "No";
 
     const movieTitle = movieData.rottenTomatoes?.title || movieData.imdb?.title || "Unknown";
+
+    // Use genres from movieData.genres if present, otherwise fallback to RT genres
+    const genres =
+        (movieData.genres && movieData.genres.length)
+            ? movieData.genres
+            : (movieData.rottenTomatoes?.genres && movieData.rottenTomatoes.genres.length)
+                ? movieData.rottenTomatoes.genres
+                : (movieData.imdb?.genres && movieData.imdb.genres.length)
+                    ? movieData.imdb.genres
+                    : [];
+
+    // Oscar line logic
+    let oscarLine = "- Oscar Recognition: ";
+    if (Array.isArray(movieData.oscars) && movieData.oscars.length > 0) {
+        const wins = movieData.oscars.filter(o => o.isWin).length;
+        const noms = movieData.oscars.length;
+        oscarLine += `The movie received ${noms} Oscar nomination${noms > 1 ? "s" : ""}${wins ? `, including ${wins} win${wins > 1 ? "s" : ""}` : ""}.`;
+    } else {
+        oscarLine += "The movie did not receive any Oscar nominations.";
+    }
 
     const prompt = `
     The user has the following preferences:
@@ -23,8 +43,8 @@ async function generateMovieDecision(movieData, userPrefs, finalScore) {
     - IMDb Rating: ${movieData.imdb?.rating || "N/A"}
     - RT Critic Score: ${movieData.rottenTomatoes?.criticScore || "N/A"}
     - RT Audience Score: ${movieData.rottenTomatoes?.audienceScore || "N/A"}
-    - Genres: ${movieData.genres?.join(", ") || "None"}
-    - Oscar Recognition: The movie has received significant recognition at the Oscars, including wins and nominations across multiple categories.
+    - Genres: ${genres.join(", ") || "None"}
+    ${oscarLine}
 
     The AI determined: ${shouldWatch}
     Provide a short explanation why the user should or should not watch this movie, considering their preferences and the movie's attributes.

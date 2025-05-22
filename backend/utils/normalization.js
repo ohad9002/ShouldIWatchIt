@@ -1,13 +1,63 @@
 // utils/normalization.js
 
+const genreMap = {
+    "Action": "Action",
+    "Adventure": "Adventure",
+    "Animation": "Animation",
+    "Biography": "Biography",
+    "Comedy": "Comedy",
+    "Crime": "Crime",
+    "Documentary": "Documentary",
+    "Drama": "Drama",
+    "Family": "Family",
+    "Fantasy": "Fantasy",
+    "History": "History",
+    "Horror": "Horror",
+    "Kids": "Kids & Family",
+    "Kids & Family": "Kids & Family",
+    "LGBTQ+": "LGBTQ+",
+    "Music": "Music",
+    "Musical": "Musical",
+    "Mystery": "Mystery & Thriller",
+    "Mystery & Thriller": "Mystery & Thriller",
+    "News": "News",
+    "Reality": "Reality",
+    "Romance": "Romance",
+    "Sci-Fi": "Sci-Fi",
+    "Short": "Short",
+    "Soap": "Soap",
+    "Special Interest": "Special Interest",
+    "Sports": "Sports",
+    "Stand-Up": "Stand-Up",
+    "Talk Show": "Talk Show",
+    "Thriller": "Mystery & Thriller",
+    "Travel": "Travel",
+    "Variety": "Variety",
+    "War": "War",
+    "Western": "Western",
+    "Game Show": "Game Show",
+    "Health & Wellness": "Health & Wellness",
+    "Holiday": "Holiday",
+    "Nature": "Nature",
+    "House & Garden": "House & Garden",
+    "Anime": "Anime",
+    // Add more mappings as needed
+};
+
 const normalizeGenre = (genre) => {
+    if (!genre) return '';
+    // Remove Epic/Psychological, split on '&' or ',' and trim
     return genre
         .replace(/\b(Epic|Psychological)\b/gi, '')
-        .replace('&', ',')
-        .trim();
+        .split(/,|&/)
+        .map(g => g.trim())
+        .map(g => genreMap[g] || g)
+        .filter(Boolean)
+        .join(', ');
 };
 
 const normalizeOscarCategory = (category) => {
+    if (!category) return '';
     const categoryMap = {
         "ACTOR": "Best Actor",
         "ACTOR IN A SUPPORTING ROLE": "Best Supporting Actor",
@@ -34,7 +84,15 @@ const normalizeOscarCategory = (category) => {
     return categoryMap[category.toUpperCase()] || category;
 };
 
+const normalizeText = (text) => {
+    if (!text) return '';
+    return text.toLowerCase()
+               .replace(/[^a-z0-9\s]/g, '') // Remove all non-letter/number/space
+               .trim();
+};
+
 module.exports = {
     normalizeGenre,
-    normalizeOscarCategory
+    normalizeOscarCategory,
+    normalizeText
 };
