@@ -17,20 +17,25 @@ const scrapeRT = async (page, movieTitle) => {
 });
 
         console.log(`🔎 [RT] Waiting for search input...`);
-      // Try the RT-specific input first, then a generic search field
-      await page.waitForSelector(
-        'input[data-qa="search-input"], input[type="search"], input[placeholder*="Search"]',
-        { timeout: 12000 }
-      );
+       // 1) click the header search icon (if it exists) to reveal the input
+      try {
+        await page.click('button[data-qa="search-button"], button.search__icon', { timeout: 5000 });
+      } catch (e) {
+        // icon not present immediately, may already be open
+      }
 
+      // 2) now wait for the actual RT search input to appear
+      const rtSearchSelector = [
+        'input[data-qa="search-input"]',          // primary RT selector
+        'input[name="searchKeywords"]',            // fallback name attr
+        'input[placeholder*="Search"]'             // generic placeholder
+      ].join(',');
+      await page.waitForSelector(rtSearchSelector, { timeout: 15000 });
 
-         console.log(`⌨️ [RT] Typing and submitting search: "${movieTitle}"`);
-         const rtSearchSelector =
-       'input[data-qa="search-input"], input[type="search"], input[placeholder*="Search"]';
-     await page.click(rtSearchSelector);
+      // 3) fill + enter
+      console.log(`⌨️ [RT] Typing and submitting search: "${movieTitle}"`);
       await page.fill(rtSearchSelector, movieTitle);
-      await page.keyboard.press('Enter');
-
+      await page.press(rtSearchSelector, 'Enter');
       console.log(`⏳ [RT] Waiting for search results page...`);
       await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 });
 
