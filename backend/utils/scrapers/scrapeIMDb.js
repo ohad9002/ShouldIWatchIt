@@ -17,7 +17,11 @@ const scrapeIMDb = async (page, movieTitle) => {
 
     return await retry(async () => {
         try {
-            await page.goto('https://www.imdb.com/', { waitUntil: 'domcontentloaded' });
+                    await page.goto('https://www.imdb.com/', {
+  waitUntil: 'networkidle',
+  timeout: 60000       // give it up to 60s before failing
+});
+            
 
             const searchInput = page.locator('input#suggestion-search');
             console.log(`🔎 [IMDb] Ensuring search input is visible and active...`);
@@ -76,7 +80,11 @@ const scrapeIMDb = async (page, movieTitle) => {
             }
 
             console.log(`🚀 [IMDb] Navigating to best match: ${bestMatch.url}`);
-            await page.goto(bestMatch.url, { waitUntil: 'domcontentloaded' });
+        
+              await page.goto(bestMatch.url, {
+  waitUntil: 'networkidle',
+  timeout: 60000       // give it up to 60s before failing
+});
 
             console.log(`⏳ [IMDb] Waiting for rating and title...`);
             await page.waitForSelector('h1', { timeout: 10000 });

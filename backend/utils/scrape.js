@@ -13,7 +13,15 @@ async function scrapeMovieDetails(movieTitle) {
   let browser, context;
   try {
     console.log("📌 Launching browser…");
-    browser = await chromium.launch({ headless: true, slowMo: 50 });
+   browser = await chromium.launch({
+headless: true,
+  slowMo: 50,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage'
+  ]
+});
     console.log("📌 Browser instance initialized");
 
     context = await browser.newContext({

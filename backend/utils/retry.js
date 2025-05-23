@@ -1,6 +1,6 @@
 const retry = async (fn, options = {}) => {
     const {
-      retries = 3,
+      retries = 4,
       delayMs = 1000,
       factor = 2,       // Exponential backoff factor
       jitter = true     // Random small delay to avoid retry spikes

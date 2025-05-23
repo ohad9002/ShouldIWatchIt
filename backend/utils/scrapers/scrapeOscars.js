@@ -6,7 +6,11 @@ const { calculateSimilarity } = require("../similarity");
 async function scrapeOscars(page, movieTitle) {
     console.log("🎬 Starting Oscars scraping...");
 
-    await page.goto("https://awardsdatabase.oscars.org/", { waitUntil: "domcontentloaded" });
+   
+    await page.goto("https://awardsdatabase.oscars.org/", {
+  waitUntil: 'networkidle',
+  timeout: 60000       // give it up to 60s before failing
+});
     await page.waitForSelector("input#BasicSearchView_FilmTitle");
     console.log("🔍 Typing movie title into Oscars search...");
     await page.fill("input#BasicSearchView_FilmTitle", movieTitle);

@@ -11,7 +11,10 @@ const scrapeRT = async (page, movieTitle) => {
 
   try {
     return await retry(async () => {
-      await page.goto('https://www.rottentomatoes.com/', { waitUntil: 'domcontentloaded' });
+          await page.goto('https://www.rottentomatoes.com/', {
+  waitUntil: 'networkidle',
+  timeout: 60000       // give it up to 60s before failing
+});
 
       console.log(`🔎 [RT] Waiting for search input...`);
       await page.waitForSelector('input[data-qa="search-input"]', { timeout: 10000 });
@@ -67,7 +70,11 @@ const scrapeRT = async (page, movieTitle) => {
       }
 
       console.log(`🚀 [RT] Navigating to best match: ${bestMatch.url}`);
-      await page.goto(bestMatch.url, { waitUntil: 'domcontentloaded' });
+          await page.goto(bestMatch.url, {
+  waitUntil: 'networkidle',
+  timeout: 60000       // give it up to 60s before failing
+});
+      
 
       console.log(`⏳ [RT] Waiting for media-scorecard or score-board...`);
       await page.waitForSelector('media-scorecard, score-board', { timeout: 7000 });
@@ -130,7 +137,7 @@ const scrapeRT = async (page, movieTitle) => {
 
       return result;
     }, {
-      retries: 2,
+      retries: 3,
       delayMs: 2000,
       factor: 2,
       jitter: true

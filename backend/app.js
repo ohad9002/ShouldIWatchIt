@@ -9,12 +9,12 @@ const cors = require('cors');
 // 🌟 Load Environment Variables
 dotenv.config();
 const SECRET_KEY = process.env.SECRET_KEY;
-const PORT = process.env.PORT || 5000;
+const PORT       = process.env.PORT || 5000;
 
 // 🌟 Initialize Express App
 const app = express();
 
-// 🌟 Health-check endpoint (for Docker/Render)
+// 🌟 Health-check endpoint for Render
 app.get('/', (req, res) => {
   res.json({ status: 'ok' });
 });
@@ -30,18 +30,16 @@ app.use(express.static("public"));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(cors({
-  origin: '*',
-  credentials: true,
-}));
+app.use(cors({ origin: '*', credentials: true }));
 
 // 🔐 JWT Authentication Middleware
 const authenticate = (req, res, next) => {
   console.log(`🔒 Received request for protected route: ${req.method} ${req.url}`);
-  const token = 
+  const token =
     req.headers.authorization?.split(" ")[1] ||
     req.body.auth_token ||
     req.cookies.auth_token;
+
   if (!token) return res.status(401).send('No token, access denied');
   jwt.verify(token, SECRET_KEY, (err, decoded) => {
     if (err) return res.status(401).send('Invalid or expired token');
@@ -51,8 +49,8 @@ const authenticate = (req, res, next) => {
 };
 
 // 🌟 Import Routes
-const authRoutes = require('./routes/auth');
-const movieRoutes = require('./routes/movies');
+const authRoutes        = require('./routes/auth');
+const movieRoutes       = require('./routes/movies');
 const preferencesRoutes = require('./routes/preferences');
 
 // 🌟 Use Routes
