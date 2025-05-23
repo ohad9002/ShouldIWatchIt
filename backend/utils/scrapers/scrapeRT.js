@@ -1,5 +1,3 @@
-//backend/utils/scrapers/scrapeRT.js
-
 const { retry } = require('../retry');
 const { calculateSimilarity } = require('../similarity');
 
@@ -7,43 +5,28 @@ const normalize = str => str.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const scrapeRT = async (page, movieTitle) => {
   console.log(`🔍 [RT] Starting scrape for: "${movieTitle}"`);
-  console.log(`📌 [RT] Navigating to https://www.rottentomatoes.com...`);
+  console.log(`📌 [RT] Direct‐searching via URL…`);
 
   try {
     return await retry(async () => {
-          await page.goto('https://www.rottentomatoes.com/', {
-  waitUntil: 'networkidle',
-  timeout: 60000       // give it up to 60s before failing
-});
+      // 1) Hit RT’s search page directly
+      const query = encodeURIComponent(movieTitle.trim());
+      await page.goto(
+        `https://www.rottentomatoes.com/search?search=${query}`,
+        { waitUntil: 'domcontentloaded', timeout: 60000 }
+      );
+      console.log(`🔎 [RT] Loaded search page for “${movieTitle}”`);
 
-        console.log(`🔎 [RT] Waiting for search input...`);
-       // 1) click the header search icon (if it exists) to reveal the input
-      try {
-        await page.click('button[data-qa="search-button"], button.search__icon', { timeout: 5000 });
-      } catch (e) {
-        // icon not present immediately, may already be open
-      }
+      // 2) Wait for movie‐row cards
+      console.log(`🕵️ [RT] Waiting for movie results…`);
+      await page.waitForSelector(
+        'search-page-media-row', 
+        { timeout: 15000 }
+      );
 
-      // 2) now wait for the actual RT search input to appear
-      const rtSearchSelector = [
-        'input[data-qa="search-input"]',          // primary RT selector
-        'input[name="searchKeywords"]',            // fallback name attr
-        'input[placeholder*="Search"]'             // generic placeholder
-      ].join(',');
-      await page.waitForSelector(rtSearchSelector, { timeout: 15000 });
-
-      // 3) fill + enter
-      console.log(`⌨️ [RT] Typing and submitting search: "${movieTitle}"`);
-      await page.fill(rtSearchSelector, movieTitle);
-      await page.press(rtSearchSelector, 'Enter');
-      console.log(`⏳ [RT] Waiting for search results page...`);
-      await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 });
-
-      console.log(`🕵️ [RT] Waiting for movie results in "Movies" section...`);
-      await page.waitForSelector('search-page-result[type="movie"] search-page-media-row', { timeout: 7000 });
-
+      // 3) Extract all candidates
       const searchResults = await page.$$eval(
-        'search-page-result[type="movie"] search-page-media-row',
+        'search-page-media-row',
         nodes => nodes.map(row => {
           const anchor = row.querySelector('a[slot="title"]');
           return {
@@ -52,24 +35,19 @@ const scrapeRT = async (page, movieTitle) => {
           };
         })
       );
-
       console.log(`📊 [RT] Found ${searchResults.length} movie results. Comparing with: "${movieTitle}"`);
 
       if (!searchResults.length) {
-        console.warn(`⚠️ [RT] No movie search results found in Movies section.`);
+        console.warn(`⚠️ [RT] No movie search results found.`);
         return null;
       }
 
-      const queryNormalized = normalize(movieTitle);
+      // 4) Pick best match via your similarity function
       let bestMatch = { similarity: -1 };
-
       for (const result of searchResults) {
-        // CHANGE: Use raw titles for similarity
         const simScore = calculateSimilarity(result.title || '', movieTitle);
-
         console.log(`🔍 [RT] Evaluating: "${result.title}"`);
         console.log(`   🔹 Similarity score: ${simScore}`);
-
         if (simScore > bestMatch.similarity) {
           bestMatch = { ...result, similarity: simScore };
           console.log(`   ✅ New best match: "${result.title}"`);
@@ -81,72 +59,57 @@ const scrapeRT = async (page, movieTitle) => {
         return null;
       }
 
+      // 5) Navigate into the actual movie page
       console.log(`🚀 [RT] Navigating to best match: ${bestMatch.url}`);
-          await page.goto(bestMatch.url, {
-  waitUntil: 'networkidle',
-  timeout: 60000       // give it up to 60s before failing
-});
-      
+      await page.goto(bestMatch.url, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000
+      });
 
-      console.log(`⏳ [RT] Waiting for media-scorecard or score-board...`);
+      // 6) Scrape scores & metadata
+      console.log(`⏳ [RT] Waiting for media‐scorecard or score‐board...`);
       await page.waitForSelector('media-scorecard, score-board', { timeout: 7000 });
 
       const data = await page.evaluate(() => {
-        const getTextFromCategory = (label) => {
-          const items = Array.from(document.querySelectorAll('.category-wrap'));
-          for (const item of items) {
-            const key = item.querySelector('dt rt-text.key')?.innerText?.trim();
-            if (key === label) {
-              const values = item.querySelectorAll('dd [data-qa="item-value"]');
-              return Array.from(values).map(v => v.textContent.trim());
+        const getTextFromCategory = label => {
+          for (const item of document.querySelectorAll('.category-wrap')) {
+            if (item.querySelector('dt rt-text.key')?.innerText.trim() === label) {
+              return Array.from(item.querySelectorAll('dd [data-qa="item-value"]'))
+                          .map(v => v.textContent.trim());
             }
           }
           return [];
         };
-
         const getPosterImage = () => {
-          const img = document.querySelector('media-scorecard rt-img[slot="posterImage"]') ||
-                      document.querySelector('img.posterImage');
+          const img = document.querySelector('media-scorecard rt-img[slot="posterImage"]')
+                    || document.querySelector('img.posterImage');
           return img?.getAttribute('src') || 'N/A';
         };
-
-        const getTextContent = (selector) => {
-          const el = document.querySelector(selector);
-          return el?.textContent?.trim() || 'N/A';
-        };
-
-        const criticScore = getTextContent('media-scorecard rt-text[slot="criticsScore"]') ||
-                            document.querySelector('score-board')?.getAttribute('tomatometerscore') ||
-                            'N/A';
-
-        const audienceScore = getTextContent('media-scorecard rt-text[slot="audienceScore"]') ||
-                              document.querySelector('score-board')?.getAttribute('audiencescore') ||
-                              'N/A';
-
-        const rawTitle = document.querySelector('rt-text[slot="title"]')?.textContent?.trim()
-                       || document.querySelector('h1[data-qa="score-panel-movie-title"]')?.textContent?.trim()
-                       || document.querySelector('score-board')?.getAttribute('title')
-                       || 'N/A';
-
-        const releaseDate = Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
-          .map(el => el.textContent.trim())
-          .find(text => text.toLowerCase().includes('released')) || 'N/A';
+        const getText = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
 
         return {
-          title: rawTitle,
-          criticScore,
-          audienceScore,
+          title: getText('rt-text[slot="title"]')  
+                 || getText('h1[data-qa="score-panel-movie-title"]')
+                 || document.querySelector('score-board')?.getAttribute('title')
+                 || 'N/A',
+          criticScore: getText('media-scorecard rt-text[slot="criticsScore"]')
+                    || document.querySelector('score-board')?.getAttribute('tomatometerscore')
+                    || 'N/A',
+          audienceScore: getText('media-scorecard rt-text[slot="audienceScore"]')
+                      || document.querySelector('score-board')?.getAttribute('audiencescore')
+                      || 'N/A',
           genres: getTextFromCategory('Genre'),
-          releaseDate,
+          releaseDate: Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
+                            .map(el => el.textContent.trim())
+                            .find(text => text.toLowerCase().includes('released'))
+                          || 'N/A',
           image: getPosterImage()
         };
       });
 
       const result = { ...data, url: page.url() };
-
       console.log(`🎯 [RT] Final data extracted:`);
       console.log(JSON.stringify(result, null, 2));
-
       return result;
     }, {
       retries: 3,
@@ -155,7 +118,7 @@ const scrapeRT = async (page, movieTitle) => {
       jitter: true
     });
   } catch (err) {
-    console.error(`🛑 [RT] All attempts failed for "${movieTitle}":\n${err.stack || err}`);
+    console.error(`🛑 [RT] All attempts failed for "${movieTitle}":\n${err.stack}`);
     return null;
   }
 };
