@@ -1,3 +1,5 @@
+// backend/utils/scrapers/scrapeRT.js
+
 const { retry } = require('../retry');
 const { calculateSimilarity } = require('../similarity');
 
@@ -13,7 +15,19 @@ async function scrapeRT(page, movieTitle) {
   console.log(`🔍 [RT] Starting scrape for: "${movieTitle}"`);
   console.log(`📌 [RT] Direct‐searching via URL…`);
 
-  // log failed requests
+  // Block heavy and ad/analytics requests
+  await page.route('**/*', route => {
+    const url = route.request().url();
+    if (
+      url.match(/\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf)$/) ||
+      /doubleverify|adobedtm|amazon\.com|googletagmanager|analytics/.test(url)
+    ) {
+      return route.abort();
+    }
+    return route.continue();
+  });
+
+  // Log failures
   page.on('requestfailed', req => {
     console.error(`❌ [RT] Request failed: ${req.url()} → ${req.failure()?.errorText}`);
   });
@@ -21,7 +35,7 @@ async function scrapeRT(page, movieTitle) {
     console.error(`⚠️ [RT] Page error:`, err);
   });
 
-  const query = encodeURIComponent(movieTitle.trim());
+  const query     = encodeURIComponent(movieTitle.trim());
   const searchUrl = `https://www.rottentomatoes.com/search?search=${query}`;
 
   console.time('[RT] Total time');
@@ -35,8 +49,9 @@ async function scrapeRT(page, movieTitle) {
     await page.waitForSelector('search-page-media-row', { timeout: 30000 });
     console.timeEnd('[RT] wait-results');
 
-    const results = await page.$$eval('search-page-media-row', nodes =>
-      nodes.map(row => {
+    const results = await page.$$eval(
+      'search-page-media-row',
+      nodes => nodes.map(row => {
         const a = row.querySelector('a[slot="title"]');
         return { title: a?.textContent.trim() || '', url: a?.href || '' };
       })

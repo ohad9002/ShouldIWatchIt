@@ -1,3 +1,5 @@
+// backend/utils/scrapers/scrapeIMDb.js
+
 const { retry } = require('../retry');
 const { calculateSimilarity, normalizeText } = require('../similarity');
 
@@ -13,7 +15,19 @@ async function scrapeIMDb(page, movieTitle) {
   console.log(`🔍 [IMDb] Starting scrape for: "${movieTitle}"`);
   console.log(`📌 [IMDb] Direct‐searching via URL…`);
 
-  // log failed requests
+  // Block images / fonts / ads / analytics
+  await page.route('**/*', route => {
+    const url = route.request().url();
+    if (
+      url.match(/\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf)$/) ||
+      /amazon\.com|adobedtm|googletagmanager|analytics|unagi/.test(url)
+    ) {
+      return route.abort();
+    }
+    return route.continue();
+  });
+
+  // Log failures
   page.on('requestfailed', req => {
     console.error(`❌ [IMDb] Request failed: ${req.url()} → ${req.failure()?.errorText}`);
   });
@@ -23,7 +37,7 @@ async function scrapeIMDb(page, movieTitle) {
 
   return await retry(async () => {
     console.time('[IMDb] Total time');
-    const query = encodeURIComponent(movieTitle.trim());
+    const query   = encodeURIComponent(movieTitle.trim());
     const findUrl = `https://www.imdb.com/find?q=${query}&s=tt&ttype=ft`;
 
     console.time('[IMDb] goto-find');
@@ -59,7 +73,10 @@ async function scrapeIMDb(page, movieTitle) {
     console.timeEnd('[IMDb] goto-detail');
 
     console.time('[IMDb] wait-detail');
-    await page.waitForSelector('h1, [data-testid="hero-rating-bar__aggregate-rating__score"]', { timeout: 20000 });
+    await page.waitForSelector(
+      'h1, [data-testid="hero-rating-bar__aggregate-rating__score"]',
+      { timeout: 20000 }
+    );
     console.timeEnd('[IMDb] wait-detail');
 
     const data = await page.evaluate(() => {
@@ -75,6 +92,7 @@ async function scrapeIMDb(page, movieTitle) {
 
     console.timeEnd('[IMDb] Total time');
     return data;
+
   }, { retries: 3, delayMs: 2000, factor: 2, jitter: true });
 }
 
