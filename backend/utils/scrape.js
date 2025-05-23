@@ -1,10 +1,8 @@
-// backend/utils/scrape.js
-
 const { chromium }   = require('playwright');
 const { scrapeRT }   = require('./scrapers/scrapeRT');
 const { scrapeIMDb } = require('./scrapers/scrapeIMDb');
 const { scrapeOscars } = require('./scrapers/scrapeOscars');
-const { normalizeGenre } = require('./normalization');  // <-- verify this path + name!
+const { normalizeGenre } = require('./normalization');
 
 async function scrapeMovieDetails(movieTitle) {
   console.log(`🔍 Starting scrape for: "${movieTitle}"`);
@@ -13,15 +11,11 @@ async function scrapeMovieDetails(movieTitle) {
   let browser, context;
   try {
     console.log("📌 Launching browser…");
-   browser = await chromium.launch({
-headless: true,
-  slowMo: 50,
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-dev-shm-usage'
-  ]
-});
+    browser = await chromium.launch({
+      headless: true,
+      slowMo: 50,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    });
     console.log("📌 Browser instance initialized");
 
     context = await browser.newContext({
@@ -31,10 +25,7 @@ headless: true,
     });
 
     console.log("📌 Creating pages for RT and IMDb…");
-    const [ rtPage, imdbPage ] = await Promise.all([
-      context.newPage(),
-      context.newPage()
-    ]);
+    const [ rtPage, imdbPage ] = await Promise.all([context.newPage(), context.newPage()]);
 
     console.log("📌 Scraping Rotten Tomatoes and IMDb…");
     const [ rtData, imdbData ] = await Promise.all([
@@ -53,16 +44,10 @@ headless: true,
     }
 
     console.log("📌 Normalizing & merging genres…");
-    const rawGenres = [
-      ...(imdbData?.genres || []),
-      ...(rtData?.genres || [])
-    ];
-    movieData.genres = Array.from(new Set(
-      rawGenres
-        .flatMap(g => normalizeGenre(g).split(','))
-        .map(s => s.trim())
-        .filter(Boolean)
-    ));
+    const rawGenres = [...(imdbData?.genres||[]), ...(rtData?.genres||[])];
+    movieData.genres = Array.from(
+      new Set(rawGenres.flatMap(g => normalizeGenre(g).split(',')).map(s => s.trim()).filter(Boolean))
+    );
 
   } catch (err) {
     console.error('❌ Overall scraping failed:', err);

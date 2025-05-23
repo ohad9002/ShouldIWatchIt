@@ -10,12 +10,12 @@ async function scrapeIMDb(page, movieTitle) {
     const query = encodeURIComponent(movieTitle.trim());
     await page.goto(
       `https://www.imdb.com/find?q=${query}&s=tt&ttype=ft`,
-      { waitUntil: 'domcontentloaded', timeout: 60000 }
+      { waitUntil: 'domcontentloaded', timeout: 120000 }
     );
     console.log(`🔎 [IMDb] Loaded find page for “${movieTitle}”`);
 
     // 2) Wait for the title‐result list
-    await page.waitForSelector('.find-title-result', { timeout: 15000 });
+    await page.waitForSelector('.find-title-result', { timeout: 30000 });
 
     // 3) Extract all candidates
     const searchResults = await page.$$eval('.find-title-result', nodes =>
@@ -38,12 +38,12 @@ async function scrapeIMDb(page, movieTitle) {
 
     // 5) Navigate to the detail page
     console.log(`🚀 [IMDb] Navigating to best match: ${bestMatch.url}`);
-    await page.goto(bestMatch.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(bestMatch.url, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
     // 6) Scrape rating, title & poster
     console.log(`⏳ [IMDb] Waiting for rating and title...`);
-    await page.waitForSelector('h1', { timeout: 10000 });
-    await page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 10000 });
+    await page.waitForSelector('h1', { timeout: 20000 });
+    await page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 20000 });
 
     const data = await page.evaluate(() => {
       const text = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
