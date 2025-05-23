@@ -19,7 +19,7 @@ async function scrapeIMDb(page, movieTitle) {
   await page.route('**/*', route => {
     const url = route.request().url();
     if (
-      url.match(/\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf)$/) ||
+      url.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
       /amazon\.com|adobedtm|googletagmanager|analytics|unagi/.test(url)
     ) {
       return route.abort();
@@ -72,24 +72,44 @@ async function scrapeIMDb(page, movieTitle) {
     await safeGoto(page, bestMatch.url, { waitUntil: 'domcontentloaded', timeout: 120000 });
     console.timeEnd('[IMDb] goto-detail');
 
+    // wait for either the rating UI or JSON-LD fallback
     console.time('[IMDb] wait-detail');
-    await page.waitForSelector(
-      'h1, [data-testid="hero-rating-bar__aggregate-rating__score"]',
-      { timeout: 20000 }
-    );
+    await page.waitForFunction(() => {
+      return !!document.querySelector('h1') &&
+             (!!document.querySelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span') ||
+              !!document.querySelector('script[type="application/ld+json"]'));
+    }, { timeout: 20000 });
     console.timeEnd('[IMDb] wait-detail');
 
+    // extract data
     const data = await page.evaluate(() => {
       const text = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
-      return {
-        title:  text('h1'),
-        rating: text('[data-testid="hero-rating-bar__aggregate-rating__score"] span'),
-        image:  document.querySelector('.ipc-image')?.src || 'N/A',
-        url:    window.location.href
-      };
-    });
-    console.log(`🎯 [IMDb] Data:`, JSON.stringify(data, null, 2));
 
+      if (document.querySelector('[data-testid="hero-rating-bar__aggregate-rating__score"]')) {
+        return {
+          title:  text('h1'),
+          rating: text('[data-testid="hero-rating-bar__aggregate-rating__score"] span'),
+          image:  document.querySelector('.ipc-image')?.src || 'N/A',
+          url:    window.location.href
+        };
+      }
+
+      // fallback: parse JSON-LD
+      const ld = document.querySelector('script[type="application/ld+json"]');
+      if (ld) {
+        const j = JSON.parse(ld.textContent);
+        return {
+          title:  j.name || 'N/A',
+          rating: j.aggregateRating?.ratingValue || 'N/A',
+          image:  Array.isArray(j.image) ? j.image[0] : j.image || 'N/A',
+          url:    window.location.href
+        };
+      }
+
+      return { title: 'N/A', rating: 'N/A', image: 'N/A', url: window.location.href };
+    });
+
+    console.log(`🎯 [IMDb] Data:`, JSON.stringify(data, null, 2));
     console.timeEnd('[IMDb] Total time');
     return data;
 

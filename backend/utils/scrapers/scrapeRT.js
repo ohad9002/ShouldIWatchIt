@@ -19,7 +19,7 @@ async function scrapeRT(page, movieTitle) {
   await page.route('**/*', route => {
     const url = route.request().url();
     if (
-      url.match(/\.(png|jpg|jpeg|gif|svg|woff|woff2|ttf)$/) ||
+      url.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
       /doubleverify|adobedtm|amazon\.com|googletagmanager|analytics/.test(url)
     ) {
       return route.abort();
@@ -49,9 +49,8 @@ async function scrapeRT(page, movieTitle) {
     await page.waitForSelector('search-page-media-row', { timeout: 30000 });
     console.timeEnd('[RT] wait-results');
 
-    const results = await page.$$eval(
-      'search-page-media-row',
-      nodes => nodes.map(row => {
+    const results = await page.$$eval('search-page-media-row', nodes =>
+      nodes.map(row => {
         const a = row.querySelector('a[slot="title"]');
         return { title: a?.textContent.trim() || '', url: a?.href || '' };
       })
@@ -74,8 +73,13 @@ async function scrapeRT(page, movieTitle) {
   await safeGoto(page, bestMatch.url, { waitUntil: 'domcontentloaded', timeout: 120000 });
   console.timeEnd('[RT] goto-detail');
 
+  // wait for scorecard, scoreboard or JSON-LD fallback
   console.time('[RT] wait-detail');
-  await page.waitForSelector('media-scorecard, score-board', { timeout: 20000 });
+  await page.waitForFunction(() => {
+    return !!document.querySelector('media-scorecard')
+        || !!document.querySelector('score-board')
+        || !!document.querySelector('script[type="application/ld+json"]');
+  }, { timeout: 20000 });
   console.timeEnd('[RT] wait-detail');
 
   const data = await page.evaluate(() => {
@@ -94,22 +98,53 @@ async function scrapeRT(page, movieTitle) {
       || document.querySelector('img.posterImage')?.getAttribute('src')
       || 'N/A';
 
+    // 1) try DOM
+    if (document.querySelector('media-scorecard') || document.querySelector('score-board')) {
+      return {
+        title:        getText('rt-text[slot="title"]')
+                      || getText('h1[data-qa="score-panel-movie-title"]')
+                      || document.querySelector('score-board')?.getAttribute('title')
+                      || 'N/A',
+        criticScore:  getText('media-scorecard rt-text[slot="criticsScore"]')
+                      || document.querySelector('score-board')?.getAttribute('tomatometerscore')
+                      || 'N/A',
+        audienceScore:getText('media-scorecard rt-text[slot="audienceScore"]')
+                      || document.querySelector('score-board')?.getAttribute('audiencescore')
+                      || 'N/A',
+        genres:       getFromCategory('Genre'),
+        releaseDate:  Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
+                      .map(el => el.textContent.trim())
+                      .find(t => /released/i.test(t)) || 'N/A',
+        image:        getImg()
+      };
+    }
+
+    // 2) fallback JSON-LD
+    const ld = document.querySelector('script[type="application/ld+json"]');
+    if (ld) {
+      const j = JSON.parse(ld.textContent);
+      return {
+        title:        j.name || 'N/A',
+        criticScore:  j.aggregateRating?.ratingValue
+                       ? `${j.aggregateRating.ratingValue}%`
+                       : 'N/A',
+        audienceScore: j.aggregateRating?.ratingCount
+                        ? `${j.aggregateRating.ratingCount} votes`
+                        : 'N/A',
+        genres:        j.genre || [],
+        releaseDate:   j.datePublished || 'N/A',
+        image:         j.image || 'N/A'
+      };
+    }
+
+    // 3) ultimate fallback
     return {
-      title:        getText('rt-text[slot="title"]')
-                    || getText('h1[data-qa="score-panel-movie-title"]')
-                    || document.querySelector('score-board')?.getAttribute('title')
-                    || 'N/A',
-      criticScore:  getText('media-scorecard rt-text[slot="criticsScore"]')
-                    || document.querySelector('score-board')?.getAttribute('tomatometerscore')
-                    || 'N/A',
-      audienceScore:getText('media-scorecard rt-text[slot="audienceScore"]')
-                    || document.querySelector('score-board')?.getAttribute('audiencescore')
-                    || 'N/A',
-      genres:       getFromCategory('Genre'),
-      releaseDate:  Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
-                    .map(el => el.textContent.trim())
-                    .find(t => /released/i.test(t)) || 'N/A',
-      image:        getImg()
+      title: 'N/A',
+      criticScore: 'N/A',
+      audienceScore: 'N/A',
+      genres: [],
+      releaseDate: 'N/A',
+      image: 'N/A'
     };
   });
 
