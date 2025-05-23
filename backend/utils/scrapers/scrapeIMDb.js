@@ -20,23 +20,31 @@ const scrapeIMDb = async (page, movieTitle) => {
             
 
               // Use the official suggestion-search or fallback to the global search box
+    // broaden to every possible IMDb search input
   const searchInput = page.locator(
-    'input#suggestion-search, input[name="q"], input[aria-label="Search IMDb"]'
+    [
+      'input#suggestion-search',        // default suggestion box
+      'input[name="q"]',                // global header search
+      'input[aria-label="Search IMDb"]',// aria label fallback
+      'input[type="search"]'            // catch-all
+    ].join(',')
   );
             console.log(`🔎 [IMDb] Ensuring search input is visible and active...`);
 
             try {
                    // If category toggle exists, open it (optional)
     await page.click('label[for="navbar-search-category-select"]').catch(() => {});
-    await searchInput.waitFor({ state: 'visible', timeout: 10000 });
+       // wait a bit longer on slow networks
+    await searchInput.waitFor({ state: 'visible', timeout: 15000 });
             } catch (e) {
                 console.error(`❌ [IMDb] Could not find visible search input.`);
                 throw new Error('[IMDb] Search input not found or not visible in time.');
             }
 
             console.log(`⌨️ [IMDb] Typing and submitting search: "${movieTitle}"`);
-         await searchInput.fill(movieTitle);
-            await searchInput.press('Enter');
+                  await searchInput.fill(movieTitle);
+            // some builds need an explicit click on the magnifier
+            await page.keyboard.press('Enter');
 
             console.log(`🚀 [IMDb] Waiting for search results page...`);
             await page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 15000 });

@@ -16,18 +16,19 @@ const scrapeRT = async (page, movieTitle) => {
   timeout: 60000       // give it up to 60s before failing
 });
 
-      console.log(`🔎 [RT] Waiting for search input...`);
-    +  // Try both the old RT selector and a generic <input[type="search"]> fallback
-  await page.waitForSelector(
-    'input[data-qa="search-input"], input[type="search"]',
-    { timeout: 10000 }
-  );
+        console.log(`🔎 [RT] Waiting for search input...`);
+      // Try the RT-specific input first, then a generic search field
+      await page.waitForSelector(
+        'input[data-qa="search-input"], input[type="search"], input[placeholder*="Search"]',
+        { timeout: 12000 }
+      );
 
 
-      console.log(`⌨️ [RT] Typing and submitting search: "${movieTitle}"`);
-        const rtSearchSelector = 'input[data-qa="search-input"], input[type="search"]';
-  await page.click(rtSearchSelector);
-  await page.fill(rtSearchSelector, movieTitle);
+         console.log(`⌨️ [RT] Typing and submitting search: "${movieTitle}"`);
+         const rtSearchSelector =
+       'input[data-qa="search-input"], input[type="search"], input[placeholder*="Search"]';
+     await page.click(rtSearchSelector);
+      await page.fill(rtSearchSelector, movieTitle);
       await page.keyboard.press('Enter');
 
       console.log(`⏳ [RT] Waiting for search results page...`);
