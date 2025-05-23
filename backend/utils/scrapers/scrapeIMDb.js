@@ -10,11 +10,7 @@ const scrapeIMDb = async (page, movieTitle) => {
     console.log(`🔍 [IMDb] Starting scrape for: "${movieTitle}"`);
     console.log(`📌 [IMDb] Navigating to https://www.imdb.com...`);
 
-    console.log(
-  '🛠️ [DEBUG] scrapeIMDb is requiring similarity from:',
-  require.resolve('../similarity')
-);
-
+    
     return await retry(async () => {
         try {
                     await page.goto('https://www.imdb.com/', {
@@ -23,19 +19,23 @@ const scrapeIMDb = async (page, movieTitle) => {
 });
             
 
-            const searchInput = page.locator('input#suggestion-search');
+              // Use the official suggestion-search or fallback to the global search box
+  const searchInput = page.locator(
+    'input#suggestion-search, input[name="q"], input[aria-label="Search IMDb"]'
+  );
             console.log(`🔎 [IMDb] Ensuring search input is visible and active...`);
 
             try {
-                await page.click('label[for="navbar-search-category-select"]').catch(() => {});
-                await searchInput.waitFor({ state: 'visible', timeout: 10000 });
+                   // If category toggle exists, open it (optional)
+    await page.click('label[for="navbar-search-category-select"]').catch(() => {});
+    await searchInput.waitFor({ state: 'visible', timeout: 10000 });
             } catch (e) {
                 console.error(`❌ [IMDb] Could not find visible search input.`);
                 throw new Error('[IMDb] Search input not found or not visible in time.');
             }
 
             console.log(`⌨️ [IMDb] Typing and submitting search: "${movieTitle}"`);
-            await searchInput.fill(movieTitle);
+         await searchInput.fill(movieTitle);
             await searchInput.press('Enter');
 
             console.log(`🚀 [IMDb] Waiting for search results page...`);

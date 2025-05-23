@@ -17,11 +17,17 @@ const scrapeRT = async (page, movieTitle) => {
 });
 
       console.log(`🔎 [RT] Waiting for search input...`);
-      await page.waitForSelector('input[data-qa="search-input"]', { timeout: 10000 });
+    +  // Try both the old RT selector and a generic <input[type="search"]> fallback
+  await page.waitForSelector(
+    'input[data-qa="search-input"], input[type="search"]',
+    { timeout: 10000 }
+  );
+
 
       console.log(`⌨️ [RT] Typing and submitting search: "${movieTitle}"`);
-      await page.click('input[data-qa="search-input"]');
-      await page.fill('input[data-qa="search-input"]', movieTitle);
+        const rtSearchSelector = 'input[data-qa="search-input"], input[type="search"]';
+  await page.click(rtSearchSelector);
+  await page.fill(rtSearchSelector, movieTitle);
       await page.keyboard.press('Enter');
 
       console.log(`⏳ [RT] Waiting for search results page...`);
