@@ -1,26 +1,30 @@
-# Use an official Node.js image as the base
+# Use an official Playwright image (includes Chromium, Firefox, WebKit)
 FROM mcr.microsoft.com/playwright:v1.52.0-noble
 
-# Set the working directory inside the container
+# Allow overriding port at build time, default to 5000
+ARG PORT=5000
+ENV PORT=${PORT}
+
+# Set the working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json to the container
+# Copy dependency manifests
 COPY package*.json ./
 
-# Install dependencies (including Playwright)
+# Install dependencies (including Playwright browsers)
 RUN npm install
 
-# Fix permissions on browser binaries
+# Fix permissions on Playwright binaries
 RUN find /ms-playwright -type f -exec chmod +x {} \;
 
-# Copy the rest of the application code to the container
+# Copy application source
 COPY . .
 
-# Ensure the container runs as root
+# Ensure root user so we can bind low ports if needed
 USER root
 
-# Expose the port your app runs on
-EXPOSE 3000
+# Expose the chosen port
+EXPOSE ${PORT}
 
-# Start the application
+# Start the app
 CMD ["npm", "start"]

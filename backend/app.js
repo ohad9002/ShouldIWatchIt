@@ -14,70 +14,66 @@ const PORT = process.env.PORT || 5000;
 // 🌟 Initialize Express App
 const app = express();
 
+// 🌟 Health-check endpoint (for Docker/Render)
+app.get('/', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 // 🌟 Connect to MongoDB
 mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => console.log("✅ MongoDB connected successfully!"))
-    .catch((err) => console.error("❌ MongoDB connection error:", err));
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB connected successfully!"))
+  .catch(err => console.error("❌ MongoDB connection error:", err));
 
 // 🌟 Middleware
-app.use(express.static("public")); // Serve static files
-app.use(cookieParser()); // Parse cookies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded data
-app.use(express.json()); // Parse JSON data
-
+app.use(express.static("public"));
+app.use(cookieParser());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 app.use(cors({
-    origin: '*', // Allow all origins (for testing only)
-    credentials: true, // Allow cookies and credentials
+  origin: '*',
+  credentials: true,
 }));
 
 // 🔐 JWT Authentication Middleware
 const authenticate = (req, res, next) => {
-    console.log(`🔒 Received request for protected route: ${req.method} ${req.url}`);
-
-    // Check token in Authorization header, body, or cookies
-    const token =
-        req.headers.authorization?.split(" ")[1] ||
-        req.body.auth_token ||
-        req.cookies.auth_token;
-
-    if (!token) {
-        return res.status(401).send('No token, access denied');
-    }
-
-    jwt.verify(token, SECRET_KEY, (err, decoded) => {
-        if (err) {
-            return res.status(401).send('Invalid or expired token');
-        }
-        req.user = decoded; // Attach user info
-        next();
-    });
+  console.log(`🔒 Received request for protected route: ${req.method} ${req.url}`);
+  const token = 
+    req.headers.authorization?.split(" ")[1] ||
+    req.body.auth_token ||
+    req.cookies.auth_token;
+  if (!token) return res.status(401).send('No token, access denied');
+  jwt.verify(token, SECRET_KEY, (err, decoded) => {
+    if (err) return res.status(401).send('Invalid or expired token');
+    req.user = decoded;
+    next();
+  });
 };
 
 // 🌟 Import Routes
-const authRoutes = require('./routes/auth'); // Authentication routes
-const movieRoutes = require('./routes/movies'); // Movie-related routes
-const preferencesRoutes = require('./routes/preferences'); // Preferences routes
+const authRoutes = require('./routes/auth');
+const movieRoutes = require('./routes/movies');
+const preferencesRoutes = require('./routes/preferences');
 
 // 🌟 Use Routes
 app.use('/api/auth', (req, res, next) => {
-    console.log(`➡️ Received request on /api/auth: ${req.method} ${req.url}`);
-    next();
-}, authRoutes); // Register auth routes
+  console.log(`➡️ Received request on /api/auth: ${req.method} ${req.url}`);
+  next();
+}, authRoutes);
 
 app.use('/api/preferences', (req, res, next) => {
-    console.log(`➡️ Received request on /api/preferences: ${req.method} ${req.url}`);
-    next();
-}, preferencesRoutes); // Register preferences routes
+  console.log(`➡️ Received request on /api/preferences: ${req.method} ${req.url}`);
+  next();
+}, preferencesRoutes);
 
 app.use('/api/movies', (req, res, next) => {
-    console.log(`➡️ Received request on /api/movies: ${req.method} ${req.url}`);
-    next();
-}, movieRoutes); // Register movie routes
+  console.log(`➡️ Received request on /api/movies: ${req.method} ${req.url}`);
+  next();
+}, movieRoutes);
 
-// 🌟 Start the Server
-app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
+// 🌟 Start the Server (bind to 0.0.0.0 so Docker/Render can reach it)
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Server running on 0.0.0.0:${PORT}`);
 });
 
 module.exports = app;
