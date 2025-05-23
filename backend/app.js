@@ -9,7 +9,7 @@ const cors = require('cors');
 // 🌟 Load Environment Variables
 dotenv.config();
 const SECRET_KEY = process.env.SECRET_KEY;
-const PORT       = process.env.PORT || 5000;
+const PORT       = process.env.PORT || 5000;     // ← CHANGED: allow Render’s PORT
 
 // 🌟 Initialize Express App
 const app = express();
@@ -71,7 +71,7 @@ app.use('/api/movies', (req, res, next) => {
 
 // 🌟 Start the Server (bind to 0.0.0.0 so Docker/Render can reach it)
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Server running on 0.0.0.0:${PORT}`);
+  console.log(`✅ Server running on 0.0.0.0:${PORT}`);  // ← CHANGED: explicit host binding
 });
 
 module.exports = app;
