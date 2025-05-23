@@ -15,19 +15,15 @@ async function scrapeRT(page, movieTitle) {
   console.log(`🔍 [RT] Starting scrape for: "${movieTitle}"`);
   console.log(`📌 [RT] Direct‐searching via URL…`);
 
-  // Block heavy and ad/analytics requests
+  // Block images/fonts/ads/analytics
   await page.route('**/*', route => {
-    const url = route.request().url();
-    if (
-      url.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
-      /doubleverify|adobedtm|amazon\.com|googletagmanager|analytics/.test(url)
-    ) {
+    const u = route.request().url();
+    if (u.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
+        /doubleverify|adobedtm|amazon\.com|googletagmanager|analytics/.test(u)) {
       return route.abort();
     }
     return route.continue();
   });
-
-  // Log failures
   page.on('requestfailed', req => {
     console.error(`❌ [RT] Request failed: ${req.url()} → ${req.failure()?.errorText}`);
   });
@@ -35,120 +31,109 @@ async function scrapeRT(page, movieTitle) {
     console.error(`⚠️ [RT] Page error:`, err);
   });
 
-  const query     = encodeURIComponent(movieTitle.trim());
-  const searchUrl = `https://www.rottentomatoes.com/search?search=${query}`;
+  const q  = encodeURIComponent(movieTitle.trim());
+  const u  = `https://www.rottentomatoes.com/search?search=${q}`;
 
   console.time('[RT] Total time');
   console.time('[RT] goto-search');
-  await safeGoto(page, searchUrl, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await safeGoto(page, u, { waitUntil: 'domcontentloaded', timeout: 120000 });
   console.timeEnd('[RT] goto-search');
-  console.log(`🔎 [RT] Loaded search page for "${movieTitle}"`);
 
-  const bestMatch = await retry(async () => {
-    console.time('[RT] wait-results');
-    await page.waitForSelector('search-page-media-row', { timeout: 30000 });
-    console.timeEnd('[RT] wait-results');
+  console.time('[RT] wait-search');
+  await page.waitForSelector('search-page-media-row', { timeout: 30000 });
+  console.timeEnd('[RT] wait-search');
 
-    const results = await page.$$eval('search-page-media-row', nodes =>
-      nodes.map(row => {
-        const a = row.querySelector('a[slot="title"]');
-        return { title: a?.textContent.trim() || '', url: a?.href || '' };
-      })
-    );
-    console.log(`📊 [RT] Found ${results.length} results vs "${movieTitle}"`);
-    if (!results.length) throw new Error('no search results');
+  const list = await page.$$eval('search-page-media-row', nodes =>
+    nodes.map(n => {
+      const a = n.querySelector('a[slot="title"]');
+      return { title: a?.textContent.trim()||'', url: a?.href||'' };
+    })
+  );
+  console.log(`📊 [RT] Found ${list.length} results vs "${movieTitle}"`);
+  if (!list.length) return null;
 
-    let best = { similarity: -1 };
-    for (const r of results) {
-      const s = calculateSimilarity(r.title, movieTitle);
-      console.log(`🔍 [RT] Evaluating "${r.title}" → ${s.toFixed(3)}`);
-      if (s > best.similarity) best = { ...r, similarity: s };
-    }
-    if (!best.url) throw new Error('no matching URL');
-    return best;
-  }, { retries: 3, delayMs: 2000, factor: 2, jitter: true });
+  let best = { similarity: -1 };
+  for (const r of list) {
+    const s = calculateSimilarity(r.title, movieTitle);
+    if (s > best.similarity) best = { ...r, similarity: s };
+  }
+  if (!best.url) return null;
 
-  console.log(`🚀 [RT] Best match: ${bestMatch.title} → ${bestMatch.url}`);
+  console.log(`🚀 [RT] Best match → ${best.url}`);
   console.time('[RT] goto-detail');
-  await safeGoto(page, bestMatch.url, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await safeGoto(page, best.url, { waitUntil: 'domcontentloaded', timeout: 120000 });
   console.timeEnd('[RT] goto-detail');
 
-  // wait for scorecard, scoreboard or JSON-LD fallback
-  console.time('[RT] wait-detail');
-  await page.waitForFunction(() => {
-    return !!document.querySelector('media-scorecard')
-        || !!document.querySelector('score-board')
-        || !!document.querySelector('script[type="application/ld+json"]');
-  }, { timeout: 20000 });
-  console.timeEnd('[RT] wait-detail');
+  // race: scorecard widget or JSON-LD
+  await Promise.any([
+    page.waitForSelector('media-scorecard', { timeout: 10000 }),
+    page.waitForSelector('score-board',    { timeout: 10000 }),
+    page.waitForSelector('script[type="application/ld+json"]', { timeout: 10000 })
+  ]).catch(() => {});
 
   const data = await page.evaluate(() => {
-    const getText = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
-    const getFromCategory = label => {
-      for (const item of document.querySelectorAll('.category-wrap')) {
-        if (item.querySelector('dt rt-text.key')?.innerText.trim() === label) {
-          return Array.from(item.querySelectorAll('dd [data-qa="item-value"]'))
-                      .map(v => v.textContent.trim());
+    const getText = s => document.querySelector(s)?.textContent.trim() || 'N/A';
+    const getCat  = label => {
+      for (const el of document.querySelectorAll('.category-wrap')) {
+        if (el.querySelector('dt rt-text.key')?.innerText.trim() === label) {
+          return Array.from(el.querySelectorAll('dd [data-qa="item-value"]'))
+                      .map(x => x.textContent.trim());
         }
       }
       return [];
     };
-    const getImg = () =>
-      document.querySelector('media-scorecard rt-img[slot="posterImage"]')?.getAttribute('src')
-      || document.querySelector('img.posterImage')?.getAttribute('src')
-      || 'N/A';
 
-    // 1) try DOM
+    // 1) DOM approach
     if (document.querySelector('media-scorecard') || document.querySelector('score-board')) {
       return {
-        title:        getText('rt-text[slot="title"]')
-                      || getText('h1[data-qa="score-panel-movie-title"]')
-                      || document.querySelector('score-board')?.getAttribute('title')
-                      || 'N/A',
-        criticScore:  getText('media-scorecard rt-text[slot="criticsScore"]')
-                      || document.querySelector('score-board')?.getAttribute('tomatometerscore')
-                      || 'N/A',
-        audienceScore:getText('media-scorecard rt-text[slot="audienceScore"]')
-                      || document.querySelector('score-board')?.getAttribute('audiencescore')
-                      || 'N/A',
-        genres:       getFromCategory('Genre'),
-        releaseDate:  Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
-                      .map(el => el.textContent.trim())
-                      .find(t => /released/i.test(t)) || 'N/A',
-        image:        getImg()
+        title:         getText('rt-text[slot="title"]')
+                         || getText('h1[data-qa="score-panel-movie-title"]')
+                         || document.querySelector('score-board')?.getAttribute('title')
+                         || 'N/A',
+        criticScore:   getText('media-scorecard rt-text[slot="criticsScore"]')
+                         || document.querySelector('score-board')?.getAttribute('tomatometerscore')
+                         || 'N/A',
+        audienceScore: getText('media-scorecard rt-text[slot="audienceScore"]')
+                         || document.querySelector('score-board')?.getAttribute('audiencescore')
+                         || 'N/A',
+        genres:        getCat('Genre'),
+        releaseDate:   Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
+                           .map(e=>e.textContent.trim())
+                           .find(t=>/released/i.test(t))||'N/A',
+        image:         document.querySelector('media-scorecard rt-img[slot="posterImage"]')?.getAttribute('src')
+                         || document.querySelector('img.posterImage')?.getAttribute('src')
+                         || 'N/A'
       };
     }
 
-    // 2) fallback JSON-LD
+    // 2) JSON-LD fallback
     const ld = document.querySelector('script[type="application/ld+json"]');
     if (ld) {
-      const j = JSON.parse(ld.textContent);
-      return {
-        title:        j.name || 'N/A',
-        criticScore:  j.aggregateRating?.ratingValue
-                       ? `${j.aggregateRating.ratingValue}%`
-                       : 'N/A',
-        audienceScore: j.aggregateRating?.ratingCount
-                        ? `${j.aggregateRating.ratingCount} votes`
-                        : 'N/A',
-        genres:        j.genre || [],
-        releaseDate:   j.datePublished || 'N/A',
-        image:         j.image || 'N/A'
-      };
+      try {
+        const j = JSON.parse(ld.textContent);
+        return {
+          title:        j.name || 'N/A',
+          criticScore:  j.aggregateRating?.ratingValue
+                           ? `${j.aggregateRating.ratingValue}%`
+                           : 'N/A',
+          audienceScore:j.aggregateRating?.ratingCount
+                           ? `${j.aggregateRating.ratingCount} votes`
+                           : 'N/A',
+          genres:       Array.isArray(j.genre) ? j.genre : [ j.genre ].filter(Boolean),
+          releaseDate:  j.datePublished || 'N/A',
+          image:        Array.isArray(j.image) ? j.image[0] : j.image || 'N/A'
+        };
+      } catch { }
     }
 
-    // 3) ultimate fallback
+    // 3) fallback to N/A
     return {
-      title: 'N/A',
-      criticScore: 'N/A',
-      audienceScore: 'N/A',
-      genres: [],
-      releaseDate: 'N/A',
-      image: 'N/A'
+      title:'N/A', criticScore:'N/A', audienceScore:'N/A',
+      genres:[], releaseDate:'N/A', image:'N/A'
     };
   });
 
-  console.log(`🎯 [RT] Data:`, JSON.stringify(data, null, 2));
+  console.log(`🎯 [RT] Data:`, data);
   console.timeEnd('[RT] Total time');
   return { ...data, url: page.url() };
 }
