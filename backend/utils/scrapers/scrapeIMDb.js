@@ -1,5 +1,3 @@
-// backend/utils/scrapers/scrapeIMDb.js
-
 const { retry } = require('../retry');
 const { calculateSimilarity, normalizeText } = require('../similarity');
 
@@ -16,16 +14,16 @@ const scrapeIMDb = async (page, movieTitle) => {
     );
     console.log(`🔎 [IMDb] Loaded find page for “${movieTitle}”`);
 
-    // 2) Wait for the standard title‐result list
+    // 2) Wait for the title‐result list
     await page.waitForSelector('.find-title-result', { timeout: 15000 });
 
     // 3) Extract all candidates
     const searchResults = await page.$$eval('.find-title-result', nodes =>
       nodes.map(row => {
-        const anchor = row.querySelector('a');
+        const a = row.querySelector('a');
         return {
-          title: anchor?.textContent?.trim() || '',
-          url:   anchor?.href || ''
+          title: a?.textContent?.trim() || '',
+          url:   a?.href || ''
         };
       })
     );
@@ -36,12 +34,11 @@ const scrapeIMDb = async (page, movieTitle) => {
       return null;
     }
 
-    // 4) Pick best match via your similarity function
+    // 4) Pick best match via similarity
     let bestMatch = { similarity: -1 };
     for (const result of searchResults) {
-      const simScore = calculateSimilarity(result.title || '', movieTitle);
-      console.log(`🔍 [IMDb] Evaluating: "${result.title}"`);
-      console.log(`   🔹 Similarity score: ${simScore}`);
+      const simScore = calculateSimilarity(result.title, movieTitle);
+      console.log(`🔍 [IMDb] Evaluating: "${result.title}" → ${simScore.toFixed(3)}`);
       if (simScore > bestMatch.similarity) {
         bestMatch = { ...result, similarity: simScore };
         console.log(`   ✅ New best match: "${result.title}"`);
@@ -53,25 +50,23 @@ const scrapeIMDb = async (page, movieTitle) => {
       return null;
     }
 
-    // 5) Navigate into the actual movie page
+    // 5) Navigate to the detail page
     console.log(`🚀 [IMDb] Navigating to best match: ${bestMatch.url}`);
-    await page.goto(bestMatch.url, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000
-    });
+    await page.goto(bestMatch.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // 6) Scrape rating, title & poster
+    // 6) Scrape rating, title & poster from the rendered DOM
     console.log(`⏳ [IMDb] Waiting for rating and title...`);
     await page.waitForSelector('h1', { timeout: 10000 });
     await page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 10000 });
 
     const data = await page.evaluate(() => {
       const text = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
+      const img  = document.querySelector('.ipc-image')?.src || 'N/A';
       return {
-        title: text('h1'),
+        title:  text('h1'),
         rating: text('[data-testid="hero-rating-bar__aggregate-rating__score"] span'),
-        image: document.querySelector('.ipc-image')?.src || 'N/A',
-        url: window.location.href
+        image:  img,
+        url:    window.location.href
       };
     });
 
@@ -82,8 +77,8 @@ const scrapeIMDb = async (page, movieTitle) => {
   }, {
     retries: 3,
     delayMs: 2000,
-    factor: 2,
-    jitter: true
+    factor:  2,
+    jitter:  true
   });
 };
 
