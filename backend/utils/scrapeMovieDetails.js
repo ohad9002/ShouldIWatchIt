@@ -1,75 +1,51 @@
 // utils/scrapeMovieDetails.js
-
-const { chromium }     = require('playwright');
+const { chromium } = require('playwright');
 const { scrapeRT }     = require('./scrapers/scrapeRT');
 const { scrapeIMDb }   = require('./scrapers/scrapeIMDb');
 const { scrapeOscars } = require('./scrapers/scrapeOscars');
 const { normalizeGenre } = require('./normalization');
 
-async function scrapeMovieDetails(movieTitle) {
-  console.log(`🔍 Starting scrape for: "${movieTitle}"`);
-  const movieData = { imdb: null, rottenTomatoes: null, oscars: null, genres: [] };
-
-  let browser, context;
+async function scrapeMovieDetails(title) {
+  console.log(`🔍 scrapeMovieDetails("${title}")`);
+  const data = { imdb: null, rottenTomatoes: null, oscars: [], genres: [] };
+  const browser = await chromium.launch({ headless: true, args:['--no-sandbox'] });
+  const page    = await browser.newPage();
   try {
-    console.log("📌 Launching browser…");
-    browser = await chromium.launch({
-      headless: true,
-      slowMo: 50,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
-    console.log("📌 Browser instance initialized");
+    // —— Rotten Tomatoes
+    data.rottenTomatoes = await scrapeRT(page, title);
 
-    context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)…',
-      locale: 'en-US',
-      extraHTTPHeaders: { 'accept-language': 'en-US,en;q=0.9' }
-    });
+    // —— IMDb
+    data.imdb = await scrapeIMDb(page, title);
 
-    console.log("📌 Creating pages for RT and IMDb…");
-    const [ rtPage, imdbPage ] = await Promise.all([
-      context.newPage(),
-      context.newPage()
-    ]);
-
-    console.log("📌 Scraping Rotten Tomatoes and IMDb…");
-    const [ rtData, imdbData ] = await Promise.all([
-      scrapeRT(rtPage, movieTitle),
-      scrapeIMDb(imdbPage, movieTitle)
-    ]);
-
-    movieData.rottenTomatoes = rtData;
-    movieData.imdb            = imdbData;
-
-    if (imdbData?.title) {
-      console.log("📌 Scraping Oscars with title:", imdbData.title);
-      const oscarsPage = await context.newPage();
-      movieData.oscars = await scrapeOscars(oscarsPage, imdbData.title);
-      await oscarsPage.close();
+    // —— Oscars
+    if (data.imdb?.title) {
+      try {
+        console.log("📌 scrapeOscars…");
+        data.oscars = await scrapeOscars(page, data.imdb.title);
+      } catch (e) {
+        console.error("❌ scrapeOscars failed:", e);
+      }
     }
 
-    console.log("📌 Normalizing & merging genres…");
-    const rawGenres = [
-      ...(imdbData?.genres || []),
-      ...(rtData?.genres  || [])
+    // —— Merge genres
+    const allGenres = [
+      ...(data.imdb?.genres||[]),
+      ...(data.rottenTomatoes?.genres||[])
     ];
-
-    movieData.genres = Array.from(new Set(
-      rawGenres
-        .flatMap(g => normalizeGenre(g).split(','))
-        .map(s => s.trim())
-        .filter(Boolean)
+    data.genres = Array.from(new Set(
+      allGenres.flatMap(g => normalizeGenre(g).split(',')).map(s=>s.trim()).filter(Boolean)
     ));
 
-  } catch (err) {
-    console.error('❌ Overall scraping failed:', err);
   } finally {
-    if (context) await context.close();
-    if (browser) await browser.close();
+    await browser.close();
   }
-
-  console.log('✅ Scraping finished:', movieData);
-  return movieData;
+  console.log("✅ Done:", {
+    rt: data.rottenTomatoes?.title,
+    imdb: data.imdb?.title,
+    oscars: data.oscars.length,
+    genres: data.genres
+  });
+  return data;
 }
 
 module.exports = { scrapeMovieDetails };
