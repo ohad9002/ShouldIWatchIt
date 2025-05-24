@@ -41,18 +41,27 @@ async function scrapeIMDb(page, movieTitle) {
     console.timeEnd('[IMDb] goto-find');
 
     console.time('[IMDb] wait-find');
-    await page.waitForSelector('.find-title-result', { timeout: 30000 });
+    // IMDb now renders results in a <table class="findList"> with <tr class="findResult">
+    await page.waitForSelector('.findList tr.findResult', { timeout: 45000 });
     console.timeEnd('[IMDb] wait-find');
 
-    const results = await page.$$eval('.find-title-result', rows =>
+    // Extract title & url from each row
+    const results = await page.$$eval('.findList tr.findResult', rows =>
       rows.map(r => {
-        const a = r.querySelector('a');
-        return { title: a?.textContent.trim()||'', url: a?.href||'' };
+        const link = r.querySelector('td.result_text a');
+        return {
+          title: link?.textContent.trim() || '',
+          url:   link?.href || ''
+        };
       })
     );
     console.log(`📊 [IMDb] Found ${results.length} results vs "${movieTitle}"`);
-    if (!results.length) return null;
+    if (!results.length) {
+      console.warn('⚠️ [IMDb] No search results');
+      return null;
+    }
 
+    // Pick best fuzzy match
     let best = { similarity: -1 };
     for (const r of results) {
       const s = calculateSimilarity(r.title, movieTitle);
@@ -66,16 +75,17 @@ async function scrapeIMDb(page, movieTitle) {
     await safeGoto(page, best.url, { waitUntil: 'domcontentloaded', timeout: 120000 });
     console.timeEnd('[IMDb] goto-detail');
 
-    // race: UI widget or JSON-LD attached
+    // Wait for either the UI widget or the JSON-LD script tag (attached)
     await Promise.any([
       page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 10000 }),
-      page.waitForSelector('script[type="application/ld+json"]', { timeout: 10000, state: 'attached' })
-    ]).catch(() => {});
+      page.waitForSelector('script[type="application/ld+json"]',                { timeout: 10000, state: 'attached' })
+    ]).catch(() => { /* ignore if both miss */ });
 
+    // Scrape from UI widget if present, else JSON-LD
     const data = await page.evaluate(() => {
       const txt = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
 
-      // 1) UI widget
+      // 1) UI-based
       if (document.querySelector('[data-testid="hero-rating-bar__aggregate-rating__score"]')) {
         return {
           title:  txt('h1'),
@@ -102,6 +112,7 @@ async function scrapeIMDb(page, movieTitle) {
         }
       }
 
+      // 3) ultimate fallback
       return { title:'N/A', rating:'N/A', image:'N/A', url:window.location.href };
     });
 
