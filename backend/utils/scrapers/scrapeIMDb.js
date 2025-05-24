@@ -36,22 +36,23 @@ async function scrapeIMDb(page, movieTitle) {
     const findU = `https://www.imdb.com/find?q=${q}&s=tt&ttype=ft`;
 
     console.time('[IMDb] goto-find');
-    // Use networkidle to ensure the JS-rendered results are loaded
+    // Use networkidle so that the JS-rendered list fully loads
     await safeGoto(page, findU, { waitUntil: 'networkidle', timeout: 120000 });
     console.timeEnd('[IMDb] goto-find');
 
     console.time('[IMDb] wait-find');
-    // Wait for the classic search list under td.result_text
-    await page.waitForSelector('td.result_text', { timeout: 30000 });
+    // Wait for any findResult row to appear
+    await page.waitForSelector('.findList tr.findResult', { timeout: 45000 });
     console.timeEnd('[IMDb] wait-find');
 
-    // Extract all linked titles from the result_text cells
+    // Pull out all candidate titles/URLs
     const results = await page.$$eval('td.result_text a', links =>
       links.map(a => ({ title: a.textContent.trim(), url: a.href }))
     );
     console.log(`📊 [IMDb] Found ${results.length} candidate titles`);
     if (!results.length) return null;
 
+    // Pick the best‐matching title by string similarity
     let best = { similarity: -1 };
     for (const r of results) {
       const s = calculateSimilarity(r.title, movieTitle);
@@ -65,16 +66,17 @@ async function scrapeIMDb(page, movieTitle) {
     await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 120000 });
     console.timeEnd('[IMDb] goto-detail');
 
-    // Wait for either the visible rating UI or JSON-LD fallback
+    // Wait for either the rating bar UI or the JSON-LD fallback
     await Promise.any([
       page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 10000 }),
-      page.waitForSelector('script[type="application/ld+json"]',                 { timeout: 10000 })
+      page.waitForSelector('script[type="application/ld+json"]',                { timeout: 10000 })
     ]).catch(() => {});
 
+    // Extract the final data
     const data = await page.evaluate(() => {
       const txt = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
 
-      // 1) If the standard rating bar is present
+      // 1) If the visible rating UI exists
       if (document.querySelector('[data-testid="hero-rating-bar__aggregate-rating__score"]')) {
         return {
           title:  txt('h1'),
@@ -84,7 +86,7 @@ async function scrapeIMDb(page, movieTitle) {
         };
       }
 
-      // 2) Fallback to JSON-LD embedded data
+      // 2) Otherwise, parse the embedded JSON-LD
       const el = document.querySelector('script[type="application/ld+json"]');
       if (el) {
         try {
