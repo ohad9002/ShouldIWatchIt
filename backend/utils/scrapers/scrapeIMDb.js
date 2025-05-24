@@ -36,16 +36,16 @@ async function scrapeIMDb(page, movieTitle) {
     const findU = `https://www.imdb.com/find?q=${q}&s=tt&ttype=ft`;
 
     console.time('[IMDb] goto-find');
-    // waitUntil networkidle so the JS-rendered results get injected
+    // Use networkidle to ensure the JS-rendered results are loaded
     await safeGoto(page, findU, { waitUntil: 'networkidle', timeout: 120000 });
     console.timeEnd('[IMDb] goto-find');
 
     console.time('[IMDb] wait-find');
-    // IMDb now renders its find list into <td class="result_text">
+    // Wait for the classic search list under td.result_text
     await page.waitForSelector('td.result_text', { timeout: 30000 });
     console.timeEnd('[IMDb] wait-find');
 
-    // Collect every link under td.result_text
+    // Extract all linked titles from the result_text cells
     const results = await page.$$eval('td.result_text a', links =>
       links.map(a => ({ title: a.textContent.trim(), url: a.href }))
     );
@@ -65,7 +65,7 @@ async function scrapeIMDb(page, movieTitle) {
     await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 120000 });
     console.timeEnd('[IMDb] goto-detail');
 
-    // wait for UI widget or JSON-LD on the detail page
+    // Wait for either the visible rating UI or JSON-LD fallback
     await Promise.any([
       page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 10000 }),
       page.waitForSelector('script[type="application/ld+json"]',                 { timeout: 10000 })
@@ -74,7 +74,7 @@ async function scrapeIMDb(page, movieTitle) {
     const data = await page.evaluate(() => {
       const txt = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
 
-      // 1) UI widget
+      // 1) If the standard rating bar is present
       if (document.querySelector('[data-testid="hero-rating-bar__aggregate-rating__score"]')) {
         return {
           title:  txt('h1'),
@@ -84,7 +84,7 @@ async function scrapeIMDb(page, movieTitle) {
         };
       }
 
-      // 2) JSON-LD fallback
+      // 2) Fallback to JSON-LD embedded data
       const el = document.querySelector('script[type="application/ld+json"]');
       if (el) {
         try {
@@ -95,13 +95,13 @@ async function scrapeIMDb(page, movieTitle) {
             image:  Array.isArray(j.image) ? j.image[0] : j.image || 'N/A',
             url:    window.location.href
           };
-        } catch(e) {
+        } catch (e) {
           console.error('❌ [IMDb] JSON-LD parse error', e);
         }
       }
 
-      // 3) ultimate fallback
-      return { title:'N/A', rating:'N/A', image:'N/A', url:window.location.href };
+      // 3) Ultimate fallback
+      return { title: 'N/A', rating: 'N/A', image: 'N/A', url: window.location.href };
     });
 
     console.log(`🎯 [IMDb] Data:`, data);
