@@ -11,7 +11,6 @@ const SECRET_KEY = process.env.SECRET_KEY;
 const movieCache = {};  // in-memory cache
 
 // ─── GET /api/movies?title=… ──────────────────────────────────────────
-// scrape details (IMDb, RT, Oscars) and cache them
 router.get('/', async (req, res) => {
   try {
     const title = req.query.title;
@@ -26,7 +25,6 @@ router.get('/', async (req, res) => {
       console.log("📦 Scraping movie data…");
       movieData = await scrapeMovieDetails(title);
 
-      // if none of the sources returned anything
       if (!movieData || (!movieData.imdb && !movieData.rottenTomatoes && !movieData.oscars)) {
         console.warn("⚠️ Movie data not found.");
         return res.status(404).json({ message: "Movie data not found" });
@@ -39,15 +37,14 @@ router.get('/', async (req, res) => {
 
     console.log("✅ Movie data fetched successfully:", movieData);
     res.json({ movieData });
+
   } catch (err) {
     console.error("❌ Error in /api/movies route:", err);
     res.status(500).json({ message: "Error fetching movie details" });
   }
 });
 
-
 // ─── GET /api/movies/decision?movie=… ─────────────────────────────────
-// AI decision endpoint (requires valid JWT to get a decision)
 router.get('/decision', async (req, res) => {
   try {
     const movieKey = req.query.movie;
@@ -65,7 +62,7 @@ router.get('/decision', async (req, res) => {
       });
     }
 
-    // Extract user ID from Bearer token (if any)
+    // Extract userId from Bearer token (if present)
     let userId = null;
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
@@ -96,6 +93,5 @@ router.get('/decision', async (req, res) => {
     res.status(500).json({ message: "Error processing movie decision" });
   }
 });
-
 
 module.exports = router;
