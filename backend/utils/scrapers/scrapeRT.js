@@ -12,15 +12,14 @@ async function safeGoto(page, url, options) {
 }
 
 async function scrapeRT(page, movieTitle) {
-  console.log(`🔍 [RT] Starting scrape for "${movieTitle}"`);
+  console.log(`🔍 [RT] Starting scrape for: "${movieTitle}"`);
   console.log(`📌 [RT] Direct‐searching via URL…`);
 
   // Block images/fonts/ads but allow JSON-LD/score-board
   await page.route('**/*', route => {
     const u = route.request().url();
-    if (
-      u.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
-      /doubleverify|adobedtm|amazon\.com\/assets|googletagmanager|analytics/.test(u)
+    if (u.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
+        /doubleverify|adobedtm|amazon\.com\/assets|googletagmanager|analytics/.test(u)
     ) return route.abort();
     return route.continue();
   });
@@ -36,11 +35,11 @@ async function scrapeRT(page, movieTitle) {
 
   console.time('[RT] Total time');
   console.time('[RT] goto-search');
-  await safeGoto(page, u, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await safeGoto(page, u, { waitUntil: 'networkidle', timeout: 120000 });
   console.timeEnd('[RT] goto-search');
 
   console.time('[RT] wait-search');
-  await page.waitForSelector('search-page-media-row', { timeout: 45000 });
+  await page.waitForSelector('search-page-media-row', { timeout: 30000 });
   console.timeEnd('[RT] wait-search');
 
   const list = await page.$$eval('search-page-media-row', nodes =>
@@ -62,14 +61,14 @@ async function scrapeRT(page, movieTitle) {
 
   console.log(`🚀 [RT] Best match → ${best.url}`);
   console.time('[RT] goto-detail');
-  await safeGoto(page, best.url, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 120000 });
   console.timeEnd('[RT] goto-detail');
 
-  // race: scorecard, score-board, or JSON-LD attached
+  // Race: scorecard, score-board or JSON-LD
   await Promise.any([
     page.waitForSelector('media-scorecard', { timeout: 10000 }),
     page.waitForSelector('score-board',    { timeout: 10000 }),
-    page.waitForSelector('script[type="application/ld+json"]', { timeout: 10000, state: 'attached' })
+    page.waitForSelector('script[type="application/ld+json"]', { timeout: 10000 })
   ]).catch(() => {});
 
   const data = await page.evaluate(() => {
@@ -99,8 +98,8 @@ async function scrapeRT(page, movieTitle) {
                          || 'N/A',
         genres:        getCat('Genre'),
         releaseDate:   Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
-                           .map(e => e.textContent.trim())
-                           .find(t => /released/i.test(t)) || 'N/A',
+                           .map(e=>e.textContent.trim())
+                           .find(t=>/released/i.test(t))||'N/A',
         image:         document.querySelector('media-scorecard rt-img[slot="posterImage"]')?.getAttribute('src')
                          || document.querySelector('img.posterImage')?.getAttribute('src')
                          || 'N/A'
@@ -109,7 +108,6 @@ async function scrapeRT(page, movieTitle) {
 
     // 2) JSON-LD fallback
     const ld = document.querySelector('script[type="application/ld+json"]');
-    console.log('ℹ️ [RT] JSON-LD raw:', ld?.textContent?.slice(0,200));
     if (ld) {
       try {
         const j = JSON.parse(ld.textContent);
