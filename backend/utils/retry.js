@@ -1,9 +1,11 @@
+// utils/retry.js
+
 const retry = async (fn, options = {}) => {
   const {
     retries = 4,
-    delayMs = 1500,
-    factor = 2,
-    jitter = true
+    delayMs  = 1500,
+    factor   = 2,
+    jitter   = true
   } = options;
 
   let lastError;
@@ -16,12 +18,9 @@ const retry = async (fn, options = {}) => {
       lastError = err;
       console.warn(`⚡ Attempt ${attempt} failed: ${err.message}`);
       if (attempt < retries) {
-        let delayWithJitter = currentDelay;
-        if (jitter) {
-          delayWithJitter += Math.floor(Math.random() * 300);
-        }
-        console.log(`🔁 Retrying in ${delayWithJitter}ms...`);
-        await new Promise(res => setTimeout(res, delayWithJitter));
+        let wait = currentDelay + (jitter ? Math.floor(Math.random() * 300) : 0);
+        console.log(`🔁 Retrying in ${wait}ms…`);
+        await new Promise(r => setTimeout(r, wait));
         currentDelay *= factor;
       }
     }
