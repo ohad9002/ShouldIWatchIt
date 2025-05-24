@@ -1,5 +1,3 @@
-// backend/utils/scrapers/scrapeRT.js
-
 const { retry } = require('../retry');
 const { calculateSimilarity } = require('../similarity');
 
@@ -15,13 +13,13 @@ async function scrapeRT(page, movieTitle) {
   console.log(`🔍 [RT] Starting scrape for: "${movieTitle}"`);
   console.log(`📌 [RT] Direct‐searching via URL…`);
 
-  // Block images/fonts/ads/analytics
+  // Block images/fonts/ads but allow JSON-LD/score-board
   await page.route('**/*', route => {
     const u = route.request().url();
-    if (u.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
-        /doubleverify|adobedtm|amazon\.com|googletagmanager|analytics/.test(u)) {
-      return route.abort();
-    }
+    if (
+      u.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
+      /doubleverify|adobedtm|amazon\.com\/assets|googletagmanager|analytics/.test(u)
+    ) return route.abort();
     return route.continue();
   });
   page.on('requestfailed', req => {
@@ -55,6 +53,7 @@ async function scrapeRT(page, movieTitle) {
   let best = { similarity: -1 };
   for (const r of list) {
     const s = calculateSimilarity(r.title, movieTitle);
+    console.log(`🔍 [RT] Score "${r.title}" → ${s.toFixed(3)}`);
     if (s > best.similarity) best = { ...r, similarity: s };
   }
   if (!best.url) return null;
@@ -64,7 +63,7 @@ async function scrapeRT(page, movieTitle) {
   await safeGoto(page, best.url, { waitUntil: 'domcontentloaded', timeout: 120000 });
   console.timeEnd('[RT] goto-detail');
 
-  // race: scorecard widget or JSON-LD
+  // race: scorecard, score-board, or JSON-LD
   await Promise.any([
     page.waitForSelector('media-scorecard', { timeout: 10000 }),
     page.waitForSelector('score-board',    { timeout: 10000 }),
@@ -83,31 +82,32 @@ async function scrapeRT(page, movieTitle) {
       return [];
     };
 
-    // 1) DOM approach
+    // 1) DOM-based
     if (document.querySelector('media-scorecard') || document.querySelector('score-board')) {
       return {
-        title:         getText('rt-text[slot="title"]')
-                         || getText('h1[data-qa="score-panel-movie-title"]')
-                         || document.querySelector('score-board')?.getAttribute('title')
-                         || 'N/A',
-        criticScore:   getText('media-scorecard rt-text[slot="criticsScore"]')
-                         || document.querySelector('score-board')?.getAttribute('tomatometerscore')
-                         || 'N/A',
-        audienceScore: getText('media-scorecard rt-text[slot="audienceScore"]')
-                         || document.querySelector('score-board')?.getAttribute('audiencescore')
-                         || 'N/A',
+        title:         getText('rt-text[slot="title"]') ||
+                         getText('h1[data-qa="score-panel-movie-title"]') ||
+                         document.querySelector('score-board')?.getAttribute('title') ||
+                         'N/A',
+        criticScore:   getText('media-scorecard rt-text[slot="criticsScore"]') ||
+                         document.querySelector('score-board')?.getAttribute('tomatometerscore') ||
+                         'N/A',
+        audienceScore: getText('media-scorecard rt-text[slot="audienceScore"]') ||
+                         document.querySelector('score-board')?.getAttribute('audiencescore') ||
+                         'N/A',
         genres:        getCat('Genre'),
         releaseDate:   Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
                            .map(e=>e.textContent.trim())
                            .find(t=>/released/i.test(t))||'N/A',
-        image:         document.querySelector('media-scorecard rt-img[slot="posterImage"]')?.getAttribute('src')
-                         || document.querySelector('img.posterImage')?.getAttribute('src')
-                         || 'N/A'
+        image:         document.querySelector('media-scorecard rt-img[slot="posterImage"]')?.getAttribute('src') ||
+                         document.querySelector('img.posterImage')?.getAttribute('src') ||
+                         'N/A'
       };
     }
 
     // 2) JSON-LD fallback
     const ld = document.querySelector('script[type="application/ld+json"]');
+    console.log('ℹ️ [RT] JSON-LD raw:', ld?.textContent?.slice(0,200));
     if (ld) {
       try {
         const j = JSON.parse(ld.textContent);
@@ -123,10 +123,12 @@ async function scrapeRT(page, movieTitle) {
           releaseDate:  j.datePublished || 'N/A',
           image:        Array.isArray(j.image) ? j.image[0] : j.image || 'N/A'
         };
-      } catch { }
+      } catch(e) {
+        console.error('❌ [RT] JSON-LD parse error', e);
+      }
     }
 
-    // 3) fallback to N/A
+    // 3) fallback
     return {
       title:'N/A', criticScore:'N/A', audienceScore:'N/A',
       genres:[], releaseDate:'N/A', image:'N/A'
