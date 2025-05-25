@@ -1,29 +1,11 @@
 import { useState, useEffect } from "react";
-import { fetchMovieDecision, fetchMovies } from "../assets/api";
+import { fetchMovieDecision, fetchMovies, MovieData } from "../assets/api";
 import useAuthStore from "../store/authStore.ts";
 import PopcornLoader from "../components/PopcornLoader.tsx"; // Import the PopcornLoader component
 
-type Movie = {
-  rottenTomatoes?: {
-    title: string;
-    image: string;
-    criticScore: string;
-    audienceScore: string;
-    genres: string[];
-    releaseDate: string;
-  };
-  imdb?: {
-    title: string;
-    rating: string;
-    genres: string[];
-    url: string;
-  };
-  oscars: { originalCategory: string; fullCategory: string; isWin: boolean }[]; // Add fullCategory
-};
-
 const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
   const { user } = useAuthStore();
-  const [movieData, setMovieData] = useState<Movie | null>(null);
+  const [movieData, setMovieData] = useState<MovieData | null>(null);
   const [query, setQuery] = useState("");
   const [aiDecision, setAiDecision] = useState<{
     decision: string;
@@ -53,23 +35,20 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
     console.log("🔍 Starting search for movie:", query);
     setError(null);
     setIsLoading(true);
+
     try {
       if (!query) {
         console.warn(
-          "⚠️ No query provided. Prompting user to enter a movie title.",
+          "⚠️ No query provided. Prompting user to enter a movie title."
         );
         setError("Please enter a movie title.");
         return;
       }
 
       console.log("📤 Sending request to fetchMovies with query:", query);
-      const movieResponse = await fetchMovies(query);
+      console.log("🔑 Using token:", user?.token ?? "none");
+      const movieResponse = await fetchMovies(query, user?.token);
       console.log("📥 Movie data received from fetchMovies:", movieResponse);
-
-      if (!movieResponse) {
-        console.error("❌ No movie data received from fetchMovies.");
-        throw new Error("Failed to fetch movie data.");
-      }
 
       setMovieData(movieResponse);
 
@@ -78,22 +57,23 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
         const decisionResponse = await fetchMovieDecision(query, user.token);
         console.log(
           "📥 AI Decision received from fetchMovieDecision:",
-          decisionResponse,
+          decisionResponse
         );
-
         setAiDecision({
           decision: decisionResponse.decision,
           explanation: decisionResponse.explanation,
         });
       } else {
-        console.log("ℹ️ User is not logged in. Skipping AI decision fetch.");
+        console.log(
+          "ℹ️ User is not logged in. Skipping AI decision fetch."
+        );
       }
     } catch (error) {
       console.error("❌ Error during handleSearch:", error);
       if (error instanceof Error) {
         setError(
           error.message ||
-            "Failed to fetch movie or AI decision. Please try again.",
+            "Failed to fetch movie or AI decision. Please try again."
         );
       } else {
         setError("Failed to fetch movie or AI decision. Please try again.");
@@ -167,9 +147,9 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
               </div>
             )}
             <h3 className="text-2xl font-bold">
-              {movieData.rottenTomatoes?.title || "Unknown"}
+              {movieData.rottenTomatoes.title}
             </h3>
-            {movieData.rottenTomatoes?.image ? (
+            {movieData.rottenTomatoes.image ? (
               <img
                 src={movieData.rottenTomatoes.image}
                 alt={movieData.rottenTomatoes.title}
@@ -178,27 +158,23 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
             ) : (
               <p>No image available</p>
             )}
-            <p>IMDb: {movieData.imdb?.rating || "N/A"}</p>
-            <p>RT Critics: {movieData.rottenTomatoes?.criticScore || "N/A"}</p>
-            <p>
-              RT Audience: {movieData.rottenTomatoes?.audienceScore || "N/A"}
-            </p>
+            <p>IMDb: {movieData.imdb.rating}</p>
+            <p>RT Critics: {movieData.rottenTomatoes.criticScore}</p>
+            <p>RT Audience: {movieData.rottenTomatoes.audienceScore}</p>
             <p>
               <strong>Release Date:</strong>{" "}
-              {movieData.rottenTomatoes?.releaseDate || "N/A"}
+              {movieData.rottenTomatoes.releaseDate}
             </p>
             <p>
               <strong>Genres:</strong>{" "}
-              {movieData.rottenTomatoes?.genres?.length
-                ? movieData.rottenTomatoes.genres.join(", ")
-                : "N/A"}
+              {movieData.rottenTomatoes.genres.join(", ")}
             </p>
-            {movieData?.oscars && movieData.oscars.length > 0 ? (
+            {movieData.oscars.length > 0 ? (
               <div>
                 <h4 className="text-xl font-bold mt-4">Oscar Awards</h4>
                 <ul>
-                  {movieData.oscars.map((oscar, index) => (
-                    <li key={index}>
+                  {movieData.oscars.map((oscar, idx) => (
+                    <li key={idx}>
                       <strong>{oscar.fullCategory}</strong>{" "}
                       {oscar.isWin ? "🏆 Winner" : "🎖️ Nominated"}
                     </li>
