@@ -8,11 +8,13 @@ const cors          = require('cors');
 
 // 🌟 Load Environment Variables
 dotenv.config();
-const SECRET_KEY = process.env.SECRET_KEY;
-const PORT       = process.env.PORT || 5000;  // ← bind to Render’s PORT
+const SECRET_KEY      = process.env.SECRET_KEY;
+const PORT            = process.env.PORT || 5000;
+const CLIENT_ORIGIN   = process.env.CLIENT_ORIGIN || 'https://shouldiwatchit.onrender.com';
+
+console.log('🟢 [app.js] starting up…');
 
 // 🌟 Initialize Express App
-console.log('🟢 [app.js] starting up…');
 const app = express();
 
 // 🌟 Health-check endpoint for Render
@@ -31,7 +33,12 @@ app.use(express.static("public"));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(cors({ origin: '*', credentials: true }));
+
+// ⚠️ CORS with credentials: specify your front-end origin
+app.use(cors({
+  origin: CLIENT_ORIGIN,
+  credentials: true,
+}));
 
 // 🔐 JWT Authentication Middleware
 const authenticate = (req, res, next) => {
@@ -41,10 +48,11 @@ const authenticate = (req, res, next) => {
     req.body.auth_token ||
     req.cookies.auth_token;
 
-  if (!token) return res.status(401).send('No token, access denied');
+  if (!token) return res.status(401).json({ message: 'No token, access denied' });
   jwt.verify(token, SECRET_KEY, (err, decoded) => {
-    if (err) return res.status(401).send('Invalid or expired token');
+    if (err) return res.status(401).json({ message: 'Invalid or expired token' });
     req.user = decoded;
+    console.log('✅ User authenticated:', decoded);
     next();
   });
 };
@@ -55,17 +63,21 @@ const movieRoutes       = require('./routes/movies');
 const preferencesRoutes = require('./routes/preferences');
 
 // 🌟 Use Routes
+
+// Auth & Registration (public)
 app.use('/api/auth', (req, res, next) => {
   console.log(`➡️ Received request on /api/auth: ${req.method} ${req.url}`);
   next();
 }, authRoutes);
 
-app.use('/api/preferences', (req, res, next) => {
+// Preferences (protected)
+app.use('/api/preferences', authenticate, (req, res, next) => {
   console.log(`➡️ Received request on /api/preferences: ${req.method} ${req.url}`);
   next();
 }, preferencesRoutes);
 
-app.use('/api/movies', authenticate, (req, res, next) => {
+// Movies (public search, protected decision)
+app.use('/api/movies', (req, res, next) => {
   console.log(`➡️ Received request on /api/movies: ${req.method} ${req.url}`);
   next();
 }, movieRoutes);

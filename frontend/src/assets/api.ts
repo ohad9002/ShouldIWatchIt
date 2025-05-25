@@ -28,7 +28,7 @@ export const fetchMovies = async (title: string, token: string) => {
           originalCategory: oscar.originalCategory,
           fullCategory: oscar.fullCategory,
           isWin: oscar.isWin,
-        })
+        }),
       );
     }
 
@@ -40,7 +40,9 @@ export const fetchMovies = async (title: string, token: string) => {
 };
 
 export const fetchMovieDecision = async (title: string, token: string) => {
-  console.log(`📤 Sending request to /api/movies/decision with title: ${title}`);
+  console.log(
+    `📤 Sending request to /api/movies/decision with title: ${title}`,
+  );
   console.log(`🔑 Using token: ${token}`);
 
   try {
@@ -50,7 +52,10 @@ export const fetchMovieDecision = async (title: string, token: string) => {
         Authorization: `Bearer ${token}`,
       },
     });
-    console.log("📥 Received response from /api/movies/decision:", response.data);
+    console.log(
+      "📥 Received response from /api/movies/decision:",
+      response.data,
+    );
 
     const movieData = response.data.movieData;
     if (movieData.oscars && Array.isArray(movieData.oscars)) {
@@ -63,7 +68,7 @@ export const fetchMovieDecision = async (title: string, token: string) => {
           originalCategory: oscar.originalCategory,
           fullCategory: oscar.fullCategory,
           isWin: oscar.isWin,
-        })
+        }),
       );
     }
 
