@@ -34,11 +34,16 @@ app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// ⚠️ CORS with credentials: specify your front-end origin
-app.use(cors({
+// ✅ Updated CORS setup to support credentials and preflight
+const corsOptions = {
   origin: CLIENT_ORIGIN,
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
 
 // 🔐 JWT Authentication Middleware
 const authenticate = (req, res, next) => {
