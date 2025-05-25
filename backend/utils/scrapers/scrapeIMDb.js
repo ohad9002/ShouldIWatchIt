@@ -11,12 +11,12 @@ async function safeGoto(page, url, options) {
 async function scrapeIMDb(page, movieTitle) {
   console.log(`🔍 [IMDb] Starting scrape for: "${movieTitle}"`);
 
-  // 0️⃣ Force a desktop User-Agent (IMDb sometimes serves mobile/simplified layouts)
-  await page.setUserAgent(
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-    'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-    'Chrome/114.0.0.0 Safari/537.36'
-  );
+  // 0️⃣ Force a desktop User-Agent via extra HTTP headers
+  await page.setExtraHTTPHeaders({
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                  'Chrome/114.0.0.0 Safari/537.36'
+  });
 
   // Block only analytics and ads (but allow JSON-LD and core HTML)
   await page.route('**/*', route => {
@@ -42,9 +42,6 @@ async function scrapeIMDb(page, movieTitle) {
     console.time('[IMDb] wait-find-list');
     await page.waitForSelector('.findSection .findList', { timeout: 15000 });
     console.timeEnd('[IMDb] wait-find-list');
-
-    // 📋 DEBUG: Dump the page HTML to inspect structure if needed
-    // console.log(await page.content());
 
     // 3️⃣ Try to grab visible title links with a tighter selector
     console.time('[IMDb] eval-find-links');
