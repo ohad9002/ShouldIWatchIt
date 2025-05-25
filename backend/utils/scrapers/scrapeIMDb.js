@@ -4,7 +4,10 @@ const { calculateSimilarity } = require('../similarity');
 
 async function safeGoto(page, url, options) {
   return await retry(() => page.goto(url, options), {
-    retries: 2, delayMs: 3000, factor: 2, jitter: true
+    retries: 2,
+    delayMs: 3000,
+    factor: 2,
+    jitter: true
   });
 }
 
@@ -104,8 +107,10 @@ async function scrapeIMDb(page, movieTitle) {
 
     // 6️⃣ Pick best by similarity
     let best = candidates.reduce((a, b) =>
-      calculateSimilarity(b.title, movieTitle) > calculateSimilarity(a.title, movieTitle) ? b : a
-    , { title:'', url:'', similarity: -1 });
+      calculateSimilarity(b.title, movieTitle) > calculateSimilarity(a.title, movieTitle)
+        ? b
+        : a
+    , { title: '', url: '', similarity: -1 });
 
     // 7️⃣ Visit detail page
     console.time('[IMDb] goto-detail');
@@ -148,13 +153,18 @@ async function scrapeIMDb(page, movieTitle) {
       }
 
       // Ultimate fallback
-      return { title:'N/A', rating:'N/A', image:'N/A', url:window.location.href };
+      return { title: 'N/A', rating: 'N/A', image: 'N/A', url: window.location.href };
     });
 
     console.timeEnd('[IMDb] Total');
     return data;
 
-  }, { retries: 3, delayMs: 2000, factor: 2, jitter: true });
+  }, {
+    retries: 3,
+    delayMs: 2000,
+    factor: 2,
+    jitter: true
+  });
 }
 
 module.exports = { scrapeIMDb };
