@@ -38,7 +38,7 @@ export interface MovieData {
  */
 export const fetchMovies = async (
   title: string,
-  token?: string
+  token?: string,
 ): Promise<MovieData> => {
   console.log(`📤 Sending request to /api/movies with title: ${title}`);
   console.log(`🌐 API_BASE_URL: ${API_BASE_URL}`);
@@ -79,9 +79,11 @@ export interface DecisionResponse {
  */
 export const fetchMovieDecision = async (
   title: string,
-  token: string
+  token: string,
 ): Promise<DecisionResponse> => {
-  console.log(`📤 Sending request to /api/movies/decision with title: ${title}`);
+  console.log(
+    `📤 Sending request to /api/movies/decision with title: ${title}`,
+  );
   console.log(`🔑 Using token: ${token}`);
 
   const response = await axios.get<{
