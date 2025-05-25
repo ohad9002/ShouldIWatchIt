@@ -1,6 +1,7 @@
 const { chromium } = require('playwright');
 const { scrapeRT }     = require('./scrapers/scrapeRT');
-const { scrapeIMDb }   = require('./scrapers/scrapeIMDb');
+const { scrapeIMDb } = require('../scrapers/scrapeIMDb');
+console.log(`📍 scrapeMovieDetails is using scraper at: ${require.resolve('../scrapers/scrapeIMDb')}`);
 const { scrapeOscars } = require('./scrapers/scrapeOscars');
 const { normalizeGenre } = require('./normalization');
 
