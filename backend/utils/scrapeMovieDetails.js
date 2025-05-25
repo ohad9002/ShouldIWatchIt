@@ -1,4 +1,5 @@
 // utils/scrapeMovieDetails.js
+
 const { chromium } = require('playwright');
 const { scrapeRT }     = require('./scrapers/scrapeRT');
 const { scrapeIMDb }   = require('./scrapers/scrapeIMDb');
@@ -17,11 +18,11 @@ async function scrapeMovieDetails(title) {
     // —— IMDb
     data.imdb = await scrapeIMDb(page, title);
 
-    // —— Oscars
-    if (data.imdb?.title) {
+    // —— Oscars (only if we got an IMDb URL)
+    if (data.imdb && data.imdb.url) {
       try {
         console.log("📌 scrapeOscars…");
-        data.oscars = await scrapeOscars(page, data.imdb.title);
+        data.oscars = await scrapeOscars(page, data.imdb.url);
       } catch (e) {
         console.error("❌ scrapeOscars failed:", e);
       }
@@ -33,7 +34,10 @@ async function scrapeMovieDetails(title) {
       ...(data.rottenTomatoes?.genres||[])
     ];
     data.genres = Array.from(new Set(
-      allGenres.flatMap(g => normalizeGenre(g).split(',')).map(s=>s.trim()).filter(Boolean)
+      allGenres
+        .flatMap(g => normalizeGenre(g).split(','))
+        .map(s => s.trim())
+        .filter(Boolean)
     ));
 
   } finally {
