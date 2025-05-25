@@ -1,83 +1,120 @@
+// src/lib/api.ts  (or wherever you keep your axios wrappers)
+
 import axios from "axios";
 
 export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-export const fetchMovies = async (title: string, token: string) => {
+interface Oscar {
+  originalCategory: string;
+  fullCategory:    string;
+  isWin:           boolean;
+}
+
+export interface MovieData {
+  imdb: {
+    title:  string;
+    rating: string;
+    image:  string;
+    url:    string;
+  };
+  rottenTomatoes: {
+    title:        string;
+    criticScore:  string;
+    audienceScore:string;
+    genres:       string[];
+    releaseDate:  string;
+    image:        string;
+    url:          string;
+  };
+  oscars:   Oscar[];
+  genres:   string[];
+}
+
+export const fetchMovies = async (
+  title: string,
+  token?: string
+): Promise<MovieData> => {
   console.log(`📤 Sending request to /api/movies with title: ${title}`);
   console.log(`🌐 API_BASE_URL: ${API_BASE_URL}`);
-  console.log(`🔑 Using token: ${token}`);
+  console.log(`🔑 Using token: ${token ?? "none"}`);
+
+  const headers: Record<string,string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/movies`, {
-      params: { title },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await axios.get<MovieData>(
+      `${API_BASE_URL}/api/movies`,
+      {
+        params: { title },
+        headers,
+      }
+    );
+
     console.log("🎥 Movie data fetched:", response.data);
 
-    const movieData = response.data.movieData;
-    if (movieData.oscars && Array.isArray(movieData.oscars)) {
-      movieData.oscars = movieData.oscars.map(
-        (oscar: {
-          originalCategory: string;
-          fullCategory: string;
-          isWin: boolean;
-        }) => ({
-          originalCategory: oscar.originalCategory,
-          fullCategory: oscar.fullCategory,
-          isWin: oscar.isWin,
-        }),
-      );
-    }
+    // Ensure fullCategory is preserved (though the shape should already match)
+    const cleaned = {
+      ...response.data,
+      oscars: response.data.oscars.map(o => ({
+        originalCategory: o.originalCategory,
+        fullCategory:     o.fullCategory,
+        isWin:            o.isWin,
+      })),
+    };
 
-    return movieData;
+    return cleaned;
   } catch (error) {
     console.error("❌ Error fetching movies:", error);
     throw new Error("Failed to fetch movie data.");
   }
 };
 
-export const fetchMovieDecision = async (title: string, token: string) => {
+export interface DecisionResponse {
+  movieData: MovieData;
+  decision:  string;
+  explanation: string;
+}
+
+export const fetchMovieDecision = async (
+  title: string,
+  token: string
+): Promise<DecisionResponse> => {
   console.log(
-    `📤 Sending request to /api/movies/decision with title: ${title}`,
+    `📤 Sending request to /api/movies/decision with title: ${title}`
   );
   console.log(`🔑 Using token: ${token}`);
 
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/movies/decision`, {
-      params: { movie: title },
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    console.log(
-      "📥 Received response from /api/movies/decision:",
-      response.data,
+    const response = await axios.get<{
+      movieData: MovieData;
+      decision: { decision: string; explanation?: string };
+    }>(
+      `${API_BASE_URL}/api/movies/decision`,
+      {
+        params: { movie: title },
+        headers: { Authorization: `Bearer ${token}` },
+      }
     );
 
-    const movieData = response.data.movieData;
-    if (movieData.oscars && Array.isArray(movieData.oscars)) {
-      movieData.oscars = movieData.oscars.map(
-        (oscar: {
-          originalCategory: string;
-          fullCategory: string;
-          isWin: boolean;
-        }) => ({
-          originalCategory: oscar.originalCategory,
-          fullCategory: oscar.fullCategory,
-          isWin: oscar.isWin,
-        }),
-      );
-    }
+    console.log(
+      "📥 Received response from /api/movies/decision:",
+      response.data
+    );
 
-    const { decision, explanation } = response.data.decision;
+    const { movieData, decision } = response.data;
+    const cleanedOscars = movieData.oscars.map(o => ({
+      originalCategory: o.originalCategory,
+      fullCategory:     o.fullCategory,
+      isWin:            o.isWin,
+    }));
 
     return {
-      movieData,
-      decision,
-      explanation: explanation || "No explanation provided.",
+      movieData: { ...movieData, oscars: cleanedOscars },
+      decision:  decision.decision,
+      explanation: decision.explanation ?? "No explanation provided.",
     };
   } catch (error) {
     console.error("❌ Error fetching AI decision:", error);
