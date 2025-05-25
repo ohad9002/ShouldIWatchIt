@@ -36,39 +36,34 @@ async function scrapeIMDb(page, movieTitle) {
     const findU = `https://www.imdb.com/find?q=${q}&s=tt&ttype=ft`;
 
     console.time('[IMDb] goto-find');
+    // networkidle to let the client app load
     await safeGoto(page, findU, { waitUntil: 'networkidle', timeout: 120000 });
     console.timeEnd('[IMDb] goto-find');
 
-    console.time('[IMDb] wait-find');
-    // wait for either the new or old result markup
-    await Promise.any([
-      page.waitForSelector('.findResult',     { timeout: 30000 }),
-      page.waitForSelector('td.result_text',  { timeout: 30000 })
-    ]);
-    console.timeEnd('[IMDb] wait-find');
+    // give React a moment to hydrate
+    await page.waitForTimeout(500);
 
-    // now grab whichever rows exist
+    // collect both styles of result rows
     const results = await page.evaluate(() => {
-      const rows = Array.from(document.querySelectorAll('.findResult'))
-        .map(r => {
-          const a = r.querySelector('td.result_text a');
-          return a && { title: a.textContent.trim(), url: a.href };
-        })
-        // filter out any holes
-        .filter(Boolean);
+      const out = [];
 
-      // if the new rows were empty, try the old table-based rows
-      if (rows.length === 0) {
-        return Array.from(document.querySelectorAll('td.result_text'))
-          .map(td => {
-            const a = td.querySelector('a');
-            return a && { title: a.textContent.trim(), url: a.href };
-          })
-          .filter(Boolean);
+      // new `.findResult` rows
+      for (const r of document.querySelectorAll('.findResult')) {
+        const a = r.querySelector('td.result_text a');
+        if (a?.href) out.push({ title: a.textContent.trim(), url: a.href });
       }
 
-      return rows;
+      // fallback legacy `td.result_text`
+      if (out.length === 0) {
+        for (const td of document.querySelectorAll('td.result_text')) {
+          const a = td.querySelector('a');
+          if (a?.href) out.push({ title: a.textContent.trim(), url: a.href });
+        }
+      }
+
+      return out;
     });
+
     console.log(`📊 [IMDb] Found ${results.length} candidates`);
     if (!results.length) return null;
 
@@ -79,20 +74,15 @@ async function scrapeIMDb(page, movieTitle) {
       console.log(`🔍 [IMDb] "${r.title}" → ${s.toFixed(3)}`);
       if (s > best.similarity) best = { ...r, similarity: s };
     }
-    if (!best.url) return null;
 
     console.log(`🚀 [IMDb] Best → ${best.url}`);
     console.time('[IMDb] goto-detail');
     await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 120000 });
     console.timeEnd('[IMDb] goto-detail');
 
-    // wait for rating UI or JSON-LD
-    await Promise.any([
-      page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 10000 }),
-      page.waitForSelector('script[type="application/ld+json"]',                { timeout: 10000 })
-    ]).catch(() => {});
+    // wait a bit for rating UI / JSON-LD to appear
+    await page.waitForTimeout(500);
 
-    // extract
     const data = await page.evaluate(() => {
       const txt = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
 
