@@ -12,6 +12,7 @@ const SECRET_KEY = process.env.SECRET_KEY;
 const PORT       = process.env.PORT || 5000;  // ← bind to Render’s PORT
 
 // 🌟 Initialize Express App
+console.log('🟢 [app.js] starting up…');
 const app = express();
 
 // 🌟 Health-check endpoint for Render
@@ -64,7 +65,7 @@ app.use('/api/preferences', (req, res, next) => {
   next();
 }, preferencesRoutes);
 
-app.use('/api/movies', (req, res, next) => {
+app.use('/api/movies', authenticate, (req, res, next) => {
   console.log(`➡️ Received request on /api/movies: ${req.method} ${req.url}`);
   next();
 }, movieRoutes);

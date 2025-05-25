@@ -4,31 +4,39 @@ const { scrapeIMDb }     = require('./scrapers/scrapeIMDb');
 const { scrapeOscars }   = require('./scrapers/scrapeOscars');
 const { normalizeGenre } = require('./normalization');
 
-console.log(`📍 scrapeMovieDetails is using scraper at: ${require.resolve('./scrapers/scrapeIMDb')}`);
+console.log(`📍 [scrapeMovieDetails] loading IMDb scraper from: ${require.resolve('./scrapers/scrapeIMDb')}`);
 
 async function scrapeMovieDetails(title) {
   console.log(`🔍 scrapeMovieDetails("${title}")`);
   const data = { imdb: null, rottenTomatoes: null, oscars: [], genres: [] };
-  const browser = await chromium.launch({ headless: true, args:['--no-sandbox'] });
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page    = await browser.newPage();
 
   try {
+    // —— Rotten Tomatoes
     data.rottenTomatoes = await scrapeRT(page, title);
-    data.imdb           = await scrapeIMDb(page, title);
 
+    // —— IMDb
+    data.imdb = await scrapeIMDb(page, title);
+
+    // —— Oscars
     if (data.imdb?.title && data.imdb.title !== 'N/A') {
-      try { data.oscars = await scrapeOscars(page, data.imdb.title); }
-      catch (e) { console.error("❌ scrapeOscars failed:", e); }
+      try {
+        data.oscars = await scrapeOscars(page, data.imdb.title);
+      } catch (e) {
+        console.error("❌ scrapeOscars failed:", e);
+      }
     }
 
+    // —— Merge genres
     const allGenres = [
-      ...(data.imdb?.genres||[]),
-      ...(data.rottenTomatoes?.genres||[])
+      ...(data.imdb?.genres || []),
+      ...(data.rottenTomatoes?.genres || [])
     ];
     data.genres = Array.from(new Set(
       allGenres
         .flatMap(g => normalizeGenre(g).split(','))
-        .map(s=>s.trim())
+        .map(s => s.trim())
         .filter(Boolean)
     ));
   } finally {
