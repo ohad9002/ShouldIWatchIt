@@ -29,14 +29,14 @@ async function scrapeIMDb(page, movieTitle) {
   return await retry(async () => {
     console.time('[IMDb] Total');
 
-    // 1) /find page
+    // 1) Try the /find page first
     const q     = encodeURIComponent(movieTitle.trim());
     const findU = `https://www.imdb.com/find?q=${q}&s=tt&ttype=ft`;
     console.time('[IMDb] goto-find');
     await safeGoto(page, findU, { waitUntil: 'networkidle', timeout: 90000 });
     console.timeEnd('[IMDb] goto-find');
 
-    // 2) extract title links
+    // 2) Extract any <a href^="/title/tt"> links
     console.time('[IMDb] eval-find-links');
     let candidates = await page.$$eval(
       'a[href^="/title/tt"]',
@@ -59,7 +59,7 @@ async function scrapeIMDb(page, movieTitle) {
     );
     console.timeEnd('[IMDb] eval-find-links');
 
-    // 3) fallback to suggestion API
+    // 3) If none found, fall back to the suggestion API
     if (candidates.length === 0) {
       console.warn('⚠️ [IMDb] No find-page links, using suggestion API');
       const cat = movieTitle.trim()[0].toLowerCase();
@@ -94,31 +94,29 @@ async function scrapeIMDb(page, movieTitle) {
       return null;
     }
 
-    // 4) pick best by similarity
+    // 4) Pick best by title-similarity
     let best = { similarity: -1 };
     for (const c of candidates) {
       const sim = calculateSimilarity(c.title, movieTitle);
-      console.log(`🔍 [IMDb] "${c.title}" → ${sim.toFixed(3)}`);
       if (sim > best.similarity) best = { ...c, similarity: sim };
     }
 
-    console.log(`🚀 [IMDb] Best match → ${best.url}`);
-
-    // 5) visit detail page
+    // 5) Visit detail page
     console.time('[IMDb] goto-detail');
     await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 90000 });
     console.timeEnd('[IMDb] goto-detail');
 
-    // 6) wait for rating or JSON-LD
+    // 6) Wait for rating or JSON-LD
     await Promise.any([
       page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 8000 }),
       page.waitForSelector('script[type="application/ld+json"]',                { timeout: 8000 })
     ]).catch(() => {});
 
-    // 7) scrape
+    // 7) Scrape rating + title + image
     const data = await page.evaluate(() => {
       const getText = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
 
+      // official UI
       if (document.querySelector('[data-testid="hero-rating-bar__aggregate-rating__score"]')) {
         return {
           title:  getText('h1'),
@@ -128,6 +126,7 @@ async function scrapeIMDb(page, movieTitle) {
         };
       }
 
+      // JSON-LD fallback
       const script = document.querySelector('script[type="application/ld+json"]');
       if (script) {
         try {
@@ -144,10 +143,8 @@ async function scrapeIMDb(page, movieTitle) {
       return { title:'N/A', rating:'N/A', image:'N/A', url:window.location.href };
     });
 
-    console.log(`🎯 [IMDb] Data:`, data);
     console.timeEnd('[IMDb] Total');
     return data;
-
   }, { retries: 3, delayMs: 2000, factor: 2, jitter: true });
 }
 
