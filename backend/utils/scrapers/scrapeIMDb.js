@@ -1,5 +1,4 @@
 console.log('🆕 [IMDb Scraper] Loaded NEW scrapeIMDb.js');
-// utils/scrapers/scrapeIMDb.js
 
 const fetch = require('node-fetch');
 const { retry } = require('../retry');
@@ -16,7 +15,7 @@ async function safeGoto(page, url, options) {
 async function scrapeIMDb(page, movieTitle) {
   console.log(`🔍 [IMDb] Starting scrape for: "${movieTitle}"`);
 
-  // 1️⃣ Use IMDb’s suggestion API to get the top feature-film match
+  // 1️⃣ Suggestion API
   const q      = encodeURIComponent(movieTitle.trim());
   const cat    = movieTitle[0].toLowerCase();
   const sugUrl = `https://v2.sg.media-imdb.com/suggestion/${cat}/${q}.json`;
@@ -40,10 +39,10 @@ async function scrapeIMDb(page, movieTitle) {
   const detailUrl = `https://www.imdb.com/title/${best.id}/`;
   console.log(`🚀 [IMDb] Best match → ${detailUrl}`);
 
-  // 2️⃣ Navigate to the title page
+  // 2️⃣ Navigate
   await safeGoto(page, detailUrl, { waitUntil: 'networkidle', timeout: 90000 });
 
-  // 3️⃣ Grab the JSON-LD block and parse out title, rating, image
+  // 3️⃣ JSON-LD scrape
   const data = await page.evaluate(() => {
     const script = document.querySelector('script[type="application/ld+json"]');
     if (!script) {

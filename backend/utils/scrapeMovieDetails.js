@@ -1,9 +1,10 @@
-const { chromium } = require('playwright');
-const { scrapeRT }     = require('./scrapers/scrapeRT');
-const { scrapeIMDb } = require('../scrapers/scrapeIMDb');
-console.log(`📍 scrapeMovieDetails is using scraper at: ${require.resolve('../scrapers/scrapeIMDb')}`);
-const { scrapeOscars } = require('./scrapers/scrapeOscars');
+const { chromium }       = require('playwright');
+const { scrapeRT }       = require('./scrapers/scrapeRT');
+const { scrapeIMDb }     = require('./scrapers/scrapeIMDb');
+const { scrapeOscars }   = require('./scrapers/scrapeOscars');
 const { normalizeGenre } = require('./normalization');
+
+console.log(`📍 scrapeMovieDetails is using scraper at: ${require.resolve('./scrapers/scrapeIMDb')}`);
 
 async function scrapeMovieDetails(title) {
   console.log(`🔍 scrapeMovieDetails("${title}")`);
@@ -12,22 +13,14 @@ async function scrapeMovieDetails(title) {
   const page    = await browser.newPage();
 
   try {
-    // —— Rotten Tomatoes
     data.rottenTomatoes = await scrapeRT(page, title);
+    data.imdb           = await scrapeIMDb(page, title);
 
-    // —— IMDb
-    data.imdb = await scrapeIMDb(page, title);
-
-    // —— Oscars (only if we got a real IMDb title back)
     if (data.imdb?.title && data.imdb.title !== 'N/A') {
-      try {
-        data.oscars = await scrapeOscars(page, data.imdb.title);
-      } catch (e) {
-        console.error("❌ scrapeOscars failed:", e);
-      }
+      try { data.oscars = await scrapeOscars(page, data.imdb.title); }
+      catch (e) { console.error("❌ scrapeOscars failed:", e); }
     }
 
-    // —— Merge genres
     const allGenres = [
       ...(data.imdb?.genres||[]),
       ...(data.rottenTomatoes?.genres||[])
@@ -38,14 +31,13 @@ async function scrapeMovieDetails(title) {
         .map(s=>s.trim())
         .filter(Boolean)
     ));
-
   } finally {
     await browser.close();
   }
 
   console.log("✅ Done:", {
-    rt: data.rottenTomatoes?.title,
-    imdb: data.imdb?.title,
+    rt:     data.rottenTomatoes?.title,
+    imdb:   data.imdb?.title,
     oscars: data.oscars.length,
     genres: data.genres
   });
