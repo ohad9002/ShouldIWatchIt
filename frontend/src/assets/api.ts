@@ -7,61 +7,58 @@ export const API_BASE_URL =
 
 interface Oscar {
   originalCategory: string;
-  fullCategory:    string;
-  isWin:           boolean;
+  fullCategory: string;
+  isWin: boolean;
 }
 
 export interface MovieData {
   imdb: {
-    title:  string;
+    title: string;
     rating: string;
-    image:  string;
-    url:    string;
+    image: string;
+    url: string;
   };
   rottenTomatoes: {
-    title:        string;
-    criticScore:  string;
-    audienceScore:string;
-    genres:       string[];
-    releaseDate:  string;
-    image:        string;
-    url:          string;
+    title: string;
+    criticScore: string;
+    audienceScore: string;
+    genres: string[];
+    releaseDate: string;
+    image: string;
+    url: string;
   };
-  oscars:   Oscar[];
-  genres:   string[];
+  oscars: Oscar[];
+  genres: string[];
 }
 
 export const fetchMovies = async (
   title: string,
-  token?: string
+  token?: string,
 ): Promise<MovieData> => {
   console.log(`📤 Sending request to /api/movies with title: ${title}`);
   console.log(`🌐 API_BASE_URL: ${API_BASE_URL}`);
   console.log(`🔑 Using token: ${token ?? "none"}`);
 
-  const headers: Record<string,string> = {};
+  const headers: Record<string, string> = {};
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
   try {
-    const response = await axios.get<MovieData>(
-      `${API_BASE_URL}/api/movies`,
-      {
-        params: { title },
-        headers,
-      }
-    );
+    const response = await axios.get<MovieData>(`${API_BASE_URL}/api/movies`, {
+      params: { title },
+      headers,
+    });
 
     console.log("🎥 Movie data fetched:", response.data);
 
     // Ensure fullCategory is preserved (though the shape should already match)
     const cleaned = {
       ...response.data,
-      oscars: response.data.oscars.map(o => ({
+      oscars: response.data.oscars.map((o) => ({
         originalCategory: o.originalCategory,
-        fullCategory:     o.fullCategory,
-        isWin:            o.isWin,
+        fullCategory: o.fullCategory,
+        isWin: o.isWin,
       })),
     };
 
@@ -74,16 +71,16 @@ export const fetchMovies = async (
 
 export interface DecisionResponse {
   movieData: MovieData;
-  decision:  string;
+  decision: string;
   explanation: string;
 }
 
 export const fetchMovieDecision = async (
   title: string,
-  token: string
+  token: string,
 ): Promise<DecisionResponse> => {
   console.log(
-    `📤 Sending request to /api/movies/decision with title: ${title}`
+    `📤 Sending request to /api/movies/decision with title: ${title}`,
   );
   console.log(`🔑 Using token: ${token}`);
 
@@ -91,29 +88,26 @@ export const fetchMovieDecision = async (
     const response = await axios.get<{
       movieData: MovieData;
       decision: { decision: string; explanation?: string };
-    }>(
-      `${API_BASE_URL}/api/movies/decision`,
-      {
-        params: { movie: title },
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    }>(`${API_BASE_URL}/api/movies/decision`, {
+      params: { movie: title },
+      headers: { Authorization: `Bearer ${token}` },
+    });
 
     console.log(
       "📥 Received response from /api/movies/decision:",
-      response.data
+      response.data,
     );
 
     const { movieData, decision } = response.data;
-    const cleanedOscars = movieData.oscars.map(o => ({
+    const cleanedOscars = movieData.oscars.map((o) => ({
       originalCategory: o.originalCategory,
-      fullCategory:     o.fullCategory,
-      isWin:            o.isWin,
+      fullCategory: o.fullCategory,
+      isWin: o.isWin,
     }));
 
     return {
       movieData: { ...movieData, oscars: cleanedOscars },
-      decision:  decision.decision,
+      decision: decision.decision,
       explanation: decision.explanation ?? "No explanation provided.",
     };
   } catch (error) {
