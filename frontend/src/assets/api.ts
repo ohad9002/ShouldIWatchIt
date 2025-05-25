@@ -1,4 +1,4 @@
-// src/lib/api.ts  (or wherever you keep your axios wrappers)
+// src/lib/api.ts
 
 import axios from "axios";
 
@@ -35,13 +35,15 @@ export const fetchMovies = async (
   title: string,
   token?: string,
 ): Promise<MovieData> => {
+  const finalToken = token ?? localStorage.getItem("authToken") ?? undefined;
+
   console.log(`📤 Sending request to /api/movies with title: ${title}`);
   console.log(`🌐 API_BASE_URL: ${API_BASE_URL}`);
-  console.log(`🔑 Using token: ${token ?? "none"}`);
+  console.log(`🔑 Using token: ${finalToken ?? "none"}`);
 
   const headers: Record<string, string> = {};
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  if (finalToken) {
+    headers.Authorization = `Bearer ${finalToken}`;
   }
 
   try {
@@ -77,12 +79,14 @@ export interface DecisionResponse {
 
 export const fetchMovieDecision = async (
   title: string,
-  token: string,
+  token?: string,
 ): Promise<DecisionResponse> => {
+  const finalToken = token ?? localStorage.getItem("authToken") ?? undefined;
+
   console.log(
     `📤 Sending request to /api/movies/decision with title: ${title}`,
   );
-  console.log(`🔑 Using token: ${token}`);
+  console.log(`🔑 Using token: ${finalToken ?? "none"}`);
 
   try {
     const response = await axios.get<{
@@ -90,7 +94,7 @@ export const fetchMovieDecision = async (
       decision: { decision: string; explanation?: string };
     }>(`${API_BASE_URL}/api/movies/decision`, {
       params: { movie: title },
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${finalToken}` },
     });
 
     console.log(
