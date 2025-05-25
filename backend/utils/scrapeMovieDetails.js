@@ -7,9 +7,8 @@ const { normalizeGenre } = require('./normalization');
 async function scrapeMovieDetails(title) {
   console.log(`🔍 scrapeMovieDetails("${title}")`);
   const data = { imdb: null, rottenTomatoes: null, oscars: [], genres: [] };
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  const browser = await chromium.launch({ headless: true, args:['--no-sandbox'] });
   const page    = await browser.newPage();
-
   try {
     // —— Rotten Tomatoes
     data.rottenTomatoes = await scrapeRT(page, title);
@@ -17,8 +16,8 @@ async function scrapeMovieDetails(title) {
     // —— IMDb
     data.imdb = await scrapeIMDb(page, title);
 
-    // —— Oscars (only if IMDb gave a title)
-    if (data.imdb?.title) {
+    // —— Oscars (only if we got an IMDb title back)
+    if (data.imdb?.title && data.imdb.title !== 'N/A') {
       try {
         console.log("📌 scrapeOscars…");
         data.oscars = await scrapeOscars(page, data.imdb.title);
@@ -29,8 +28,8 @@ async function scrapeMovieDetails(title) {
 
     // —— Merge & normalize genres
     const allGenres = [
-      ...(data.imdb?.genres    || []),
-      ...(data.rottenTomatoes?.genres || [])
+      ...(data.imdb?.genres||[]),
+      ...(data.rottenTomatoes?.genres||[])
     ];
     data.genres = Array.from(new Set(
       allGenres
@@ -42,14 +41,12 @@ async function scrapeMovieDetails(title) {
   } finally {
     await browser.close();
   }
-
   console.log("✅ Done:", {
-    rt:    data.rottenTomatoes?.title,
-    imdb:  data.imdb?.title,
+    rt: data.rottenTomatoes?.title,
+    imdb: data.imdb?.title,
     oscars: data.oscars.length,
     genres: data.genres
   });
-
   return data;
 }
 

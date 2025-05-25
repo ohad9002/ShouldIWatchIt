@@ -36,11 +36,11 @@ async function scrapeIMDb(page, movieTitle) {
     await safeGoto(page, findU, { waitUntil: 'networkidle', timeout: 90000 });
     console.timeEnd('[IMDb] goto-find');
 
-    // 2) pick up any /title links
+    // 2) extract title links
     console.time('[IMDb] eval-find-links');
     let candidates = await page.$$eval(
       'a[href^="/title/tt"]',
-      links => {
+      (links) => {
         const seen = new Set();
         return links.map(a => {
           const href = a.getAttribute('href') || '';
@@ -59,10 +59,10 @@ async function scrapeIMDb(page, movieTitle) {
     );
     console.timeEnd('[IMDb] eval-find-links');
 
-    // 3) fallback to suggestion API if none found
+    // 3) fallback to suggestion API
     if (candidates.length === 0) {
       console.warn('⚠️ [IMDb] No find-page links, using suggestion API');
-      const cat    = movieTitle.trim()[0].toLowerCase();
+      const cat = movieTitle.trim()[0].toLowerCase();
       const sugUrl = `https://v2.sg.media-imdb.com/suggestion/${cat}/${q}.json`;
 
       console.time('[IMDb] fetch-suggestions');
@@ -88,14 +88,13 @@ async function scrapeIMDb(page, movieTitle) {
       }
     }
 
-    console.log(`📊 [IMDb] Candidates: ${candidates.length}`);
     if (!candidates.length) {
       console.error('❌ [IMDb] Still no candidates → aborting IMDb scrape');
       console.timeEnd('[IMDb] Total');
       return null;
     }
 
-    // 4) choose best by similarity
+    // 4) pick best by similarity
     let best = { similarity: -1 };
     for (const c of candidates) {
       const sim = calculateSimilarity(c.title, movieTitle);
@@ -105,7 +104,7 @@ async function scrapeIMDb(page, movieTitle) {
 
     console.log(`🚀 [IMDb] Best match → ${best.url}`);
 
-    // 5) goto detail
+    // 5) visit detail page
     console.time('[IMDb] goto-detail');
     await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 90000 });
     console.timeEnd('[IMDb] goto-detail');
@@ -120,7 +119,6 @@ async function scrapeIMDb(page, movieTitle) {
     const data = await page.evaluate(() => {
       const getText = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
 
-      // new UI
       if (document.querySelector('[data-testid="hero-rating-bar__aggregate-rating__score"]')) {
         return {
           title:  getText('h1'),
@@ -130,7 +128,6 @@ async function scrapeIMDb(page, movieTitle) {
         };
       }
 
-      // JSON-LD fallback
       const script = document.querySelector('script[type="application/ld+json"]');
       if (script) {
         try {
