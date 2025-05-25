@@ -1,5 +1,3 @@
-// utils/scrapers/scrapeRT.js
-
 const { retry } = require('../retry');
 const { calculateSimilarity } = require('../similarity');
 
@@ -15,12 +13,15 @@ async function scrapeRT(page, movieTitle) {
   console.log(`🔍 [RT] Starting scrape for: "${movieTitle}"`);
   console.log(`📌 [RT] Direct‐searching via URL…`);
 
-  // Block images/fonts/ads but allow JSON-LD/score-board
+  // Block images, fonts, ads, analytics
   await page.route('**/*', route => {
     const u = route.request().url();
-    if (u.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
-        /doubleverify|adobedtm|amazon\.com\/assets|googletagmanager|analytics/.test(u)
-    ) return route.abort();
+    if (
+      u.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
+      /doubleverify|adobedtm|amazon\.com\/assets|googletagmanager|analytics/.test(u)
+    ) {
+      return route.abort();
+    }
     return route.continue();
   });
   page.on('requestfailed', req => {
@@ -31,26 +32,28 @@ async function scrapeRT(page, movieTitle) {
   });
 
   const q = encodeURIComponent(movieTitle.trim());
-  const u = `https://www.rottentomatoes.com/search?search=${q}`;
+  const searchUrl = `https://www.rottentomatoes.com/search?search=${q}`;
 
   console.time('[RT] Total time');
   console.time('[RT] goto-search');
-  await safeGoto(page, u, { waitUntil: 'networkidle', timeout: 120000 });
+  await safeGoto(page, searchUrl, { waitUntil: 'networkidle', timeout: 120000 });
   console.timeEnd('[RT] goto-search');
 
   console.time('[RT] wait-search');
   await page.waitForSelector('search-page-media-row', { timeout: 30000 });
   console.timeEnd('[RT] wait-search');
 
+  // pull the list of results
   const list = await page.$$eval('search-page-media-row', nodes =>
     nodes.map(n => {
       const a = n.querySelector('a[slot="title"]');
-      return { title: a?.textContent.trim()||'', url: a?.href||'' };
+      return { title: a?.textContent.trim() || '', url: a?.href || '' };
     })
   );
   console.log(`📊 [RT] Found ${list.length} results vs "${movieTitle}"`);
   if (!list.length) return null;
 
+  // choose best fuzzy match
   let best = { similarity: -1 };
   for (const r of list) {
     const s = calculateSimilarity(r.title, movieTitle);
@@ -64,15 +67,16 @@ async function scrapeRT(page, movieTitle) {
   await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 120000 });
   console.timeEnd('[RT] goto-detail');
 
-  // Race: scorecard, score-board or JSON-LD
+  // wait for any of the score widgets or JSON-LD
   await Promise.any([
     page.waitForSelector('media-scorecard', { timeout: 10000 }),
     page.waitForSelector('score-board',    { timeout: 10000 }),
     page.waitForSelector('script[type="application/ld+json"]', { timeout: 10000 })
   ]).catch(() => {});
 
+  // extract the data
   const data = await page.evaluate(() => {
-    const getText = s => document.querySelector(s)?.textContent.trim() || 'N/A';
+    const getText = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
     const getCat  = label => {
       for (const el of document.querySelectorAll('.category-wrap')) {
         if (el.querySelector('dt rt-text.key')?.innerText.trim() === label) {
@@ -83,7 +87,7 @@ async function scrapeRT(page, movieTitle) {
       return [];
     };
 
-    // 1) DOM-based
+    // 1) DOM-based extraction
     if (document.querySelector('media-scorecard') || document.querySelector('score-board')) {
       return {
         title:         getText('rt-text[slot="title"]')
@@ -98,8 +102,8 @@ async function scrapeRT(page, movieTitle) {
                          || 'N/A',
         genres:        getCat('Genre'),
         releaseDate:   Array.from(document.querySelectorAll('rt-text[slot="metadataProp"]'))
-                           .map(e=>e.textContent.trim())
-                           .find(t=>/released/i.test(t))||'N/A',
+                           .map(e => e.textContent.trim())
+                           .find(t => /released/i.test(t)) || 'N/A',
         image:         document.querySelector('media-scorecard rt-img[slot="posterImage"]')?.getAttribute('src')
                          || document.querySelector('img.posterImage')?.getAttribute('src')
                          || 'N/A'
@@ -128,15 +132,20 @@ async function scrapeRT(page, movieTitle) {
       }
     }
 
-    // 3) fallback
+    // 3) ultimate fallback
     return {
-      title:'N/A', criticScore:'N/A', audienceScore:'N/A',
-      genres:[], releaseDate:'N/A', image:'N/A'
+      title: 'N/A',
+      criticScore: 'N/A',
+      audienceScore: 'N/A',
+      genres: [],
+      releaseDate: 'N/A',
+      image: 'N/A'
     };
   });
 
   console.log(`🎯 [RT] Data:`, data);
   console.timeEnd('[RT] Total time');
+
   return { ...data, url: page.url() };
 }
 
