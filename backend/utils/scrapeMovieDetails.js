@@ -11,7 +11,6 @@ async function scrapeMovieDetails(title) {
   const data = { imdb: null, rottenTomatoes: null, oscars: [], genres: [] };
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page    = await browser.newPage();
-
   try {
     // —— Rotten Tomatoes
     data.rottenTomatoes = await scrapeRT(page, title);
@@ -19,16 +18,17 @@ async function scrapeMovieDetails(title) {
     // —— IMDb
     data.imdb = await scrapeIMDb(page, title);
 
-    // —— Oscars
+    // —— Oscars (only if we got a real IMDb title back)
     if (data.imdb?.title && data.imdb.title !== 'N/A') {
       try {
+        console.log("📌 scrapeOscars…");
         data.oscars = await scrapeOscars(page, data.imdb.title);
       } catch (e) {
         console.error("❌ scrapeOscars failed:", e);
       }
     }
 
-    // —— Merge genres
+    // —— Merge & normalize genres
     const allGenres = [
       ...(data.imdb?.genres || []),
       ...(data.rottenTomatoes?.genres || [])
@@ -42,7 +42,6 @@ async function scrapeMovieDetails(title) {
   } finally {
     await browser.close();
   }
-
   console.log("✅ Done:", {
     rt:     data.rottenTomatoes?.title,
     imdb:   data.imdb?.title,

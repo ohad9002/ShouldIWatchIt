@@ -29,10 +29,9 @@ async function scrapeIMDb(page, movieTitle) {
   return await retry(async () => {
     console.time('[IMDb] Total');
 
-    // 1️⃣ Try the “find” page first
-    const q = encodeURIComponent(movieTitle.trim());
-    const findUrl = `https://www.imdb.com/find?q=${q}&s=tt&ttype=ft`;
-
+    // 1) Try the /find page first
+    const q     = encodeURIComponent(movieTitle.trim());
+    const findU = `https://www.imdb.com/find?q=${q}&s=tt&ttype=ft`;
     console.time('[IMDb] goto-find');
     const findResp = await safeGoto(page, findUrl, { waitUntil: 'networkidle', timeout: 90000 });
     if (findResp && findResp.status() >= 400) {
@@ -42,16 +41,33 @@ async function scrapeIMDb(page, movieTitle) {
     }
     console.timeEnd('[IMDb] goto-find');
 
-    // 2️⃣ Attempt to pick the first valid result link
-    let bestUrl = await page.evaluate(() => {
-      const link = document.querySelector('.findList .findResult a');
-      return link?.href || null;
-    });
+    // 2) Extract any <a href^="/title/tt"> links
+    console.time('[IMDb] eval-find-links');
+    let candidates = await page.$$eval(
+      'a[href^="/title/tt"]',
+      (links) => {
+        const seen = new Set();
+        return links.map(a => {
+          const href = a.getAttribute('href') || '';
+          const m = href.match(/^\/title\/(tt\d+)/);
+          if (!m) return null;
+          const id = m[1];
+          const title = a.textContent.trim();
+          const key = `${id}|${title}`;
+          if (!title || seen.has(key)) return null;
+          seen.add(key);
+          return { title, url: `https://www.imdb.com/title/${id}/` };
+        })
+        .filter(Boolean)
+        .slice(0, 20);
+      }
+    );
+    console.timeEnd('[IMDb] eval-find-links');
 
-    // 3️⃣ If no link, fall back to suggestion API
-    if (!bestUrl) {
-      console.warn('⚠️ [IMDb] No find‐page link → using suggestion API');
-      const cat = movieTitle[0].toLowerCase();
+    // 3) If none found, fall back to the suggestion API
+    if (candidates.length === 0) {
+      console.warn('⚠️ [IMDb] No find-page links, using suggestion API');
+      const cat = movieTitle.trim()[0].toLowerCase();
       const sugUrl = `https://v2.sg.media-imdb.com/suggestion/${cat}/${q}.json`;
       try {
         const resp = await fetch(sugUrl);
@@ -79,12 +95,42 @@ async function scrapeIMDb(page, movieTitle) {
     if (detailResp && detailResp.status() >= 400) {
       console.error(`❌ [IMDb] detail page returned ${detailResp.status()} → parsing aborted`);
       console.timeEnd('[IMDb] Total');
-      return { title: 'N/A', rating: 'N/A', image: 'N/A', url: bestUrl };
+      return null;
     }
+
+    // 4) Pick best by title-similarity
+    let best = { similarity: -1 };
+    for (const c of candidates) {
+      const sim = calculateSimilarity(c.title, movieTitle);
+      if (sim > best.similarity) best = { ...c, similarity: sim };
+    }
+
+    // 5) Visit detail page
+    console.time('[IMDb] goto-detail');
+    await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 90000 });
     console.timeEnd('[IMDb] goto-detail');
 
-    // 5️⃣ Extract JSON-LD
+    // 6) Wait for rating or JSON-LD
+    await Promise.any([
+      page.waitForSelector('[data-testid="hero-rating-bar__aggregate-rating__score"] span', { timeout: 8000 }),
+      page.waitForSelector('script[type="application/ld+json"]',                { timeout: 8000 })
+    ]).catch(() => {});
+
+    // 7) Scrape rating + title + image
     const data = await page.evaluate(() => {
+      const getText = sel => document.querySelector(sel)?.textContent.trim() || 'N/A';
+
+      // official UI
+      if (document.querySelector('[data-testid="hero-rating-bar__aggregate-rating__score"]')) {
+        return {
+          title:  getText('h1'),
+          rating: getText('[data-testid="hero-rating-bar__aggregate-rating__score"] span'),
+          image:  document.querySelector('.ipc-image')?.src || 'N/A',
+          url:    window.location.href
+        };
+      }
+
+      // JSON-LD fallback
       const script = document.querySelector('script[type="application/ld+json"]');
       if (script) {
         try {
@@ -105,13 +151,7 @@ async function scrapeIMDb(page, movieTitle) {
     console.log(`🎯 [IMDb] Data:`, data);
     console.timeEnd('[IMDb] Total');
     return data;
-
-  }, {
-    retries: 3,
-    delayMs: 2000,
-    factor: 2,
-    jitter: true
-  });
+  }, { retries: 3, delayMs: 2000, factor: 2, jitter: true });
 }
 
 module.exports = { scrapeIMDb };
