@@ -33,7 +33,7 @@ async function scrapeIMDb(page, movieTitle) {
     const q     = encodeURIComponent(movieTitle.trim());
     const findU = `https://www.imdb.com/find?q=${q}&s=tt&ttype=ft`;
     console.time('[IMDb] goto-find');
-    const findResp = await safeGoto(page, findUrl, { waitUntil: 'networkidle', timeout: 90000 });
+    const findResp = await safeGoto(page, findU, { waitUntil: 'networkidle', timeout: 90000 });
     if (findResp && findResp.status() >= 400) {
       console.error(`❌ [IMDb] /find returned ${findResp.status()} → aborting`);
       console.timeEnd('[IMDb] Total');
