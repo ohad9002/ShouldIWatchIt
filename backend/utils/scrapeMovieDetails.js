@@ -18,7 +18,7 @@ async function scrapeMovieDetails(title) {
     // —— IMDb
     data.imdb = await scrapeIMDb(page, title);
 
-    // —— Oscars (only if we got a real IMDb title back)
+    // —— Oscars (only if we got an IMDb title back)
     if (data.imdb?.title && data.imdb.title !== 'N/A') {
       try {
         console.log("📌 scrapeOscars…");
