@@ -129,7 +129,14 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
             Search
           </button>
         </div>
-        {isLoading && <PopcornLoader />}
+        {isLoading && (
+          <>
+            <PopcornLoader />
+            <p className="text-center mt-4" style={{ color: "var(--primary-color)" }}>
+              Please wait, this may take a few moments...
+            </p>
+          </>
+        )}
         {error && <p style={{ color: "var(--primary-color)" }}>{error}</p>}
         {movieData && (
           <div className="mt-6">

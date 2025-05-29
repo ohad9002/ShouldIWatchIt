@@ -132,6 +132,14 @@ async function getMovieDecision(userId, movieData) {
         console.log(`   - weightedOscarScore: ${weightedOscarScore.toFixed(2)}`);
         console.log(`✅ Final Score (Capped at 100): ${finalScore.toFixed(2)}`);
 
+        // Only include user preferences for the movie's genres
+        const relevantGenrePrefs = genreList
+          .map(g => ({
+            name: g,
+            preference: genrePrefMap[g] ?? 5
+          }))
+          .filter(g => g.name); // filter out undefined/null
+
         const formattedPrefs = {
             imdbPref,
             rtCriticPref,
@@ -142,14 +150,6 @@ async function getMovieDecision(userId, movieData) {
                 preference: pref.preference
             }))
         };
-
-        // Only include user preferences for the movie's genres
-        const relevantGenrePrefs = genreList
-          .map(g => ({
-            name: g,
-            preference: genrePrefMap[g] ?? 5
-          }))
-          .filter(g => g.name); // filter out undefined/null
 
         return await generateMovieDecision(movieData, formattedPrefs, finalScore);
 
