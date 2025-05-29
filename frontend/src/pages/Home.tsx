@@ -166,7 +166,12 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
             <p>
               <strong>Genres:</strong>{" "}
               {Array.isArray(movieData.rottenTomatoes.genres) &&
-                movieData.rottenTomatoes.genres.map((g) => <span>{g}</span>)}
+                movieData.rottenTomatoes.genres.map((g, i) => (
+                  <span key={g}>
+                    {g}
+                    {i < movieData.rottenTomatoes.genres.length - 1 ? ", " : ""}
+                  </span>
+                ))}
             </p>
             {movieData.oscars.length > 0 ? (
               <div>

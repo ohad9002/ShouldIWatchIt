@@ -53,9 +53,10 @@ router.get('/:userId', authenticate, async (req, res) => {
         }, {});
 
         res.json({
-            ratings: ratingPreference || { rtCritic: 5, rtPopular: 5, imdb: 5 },
+            ratings: ratingPreference || { rtCritic: 5, rtPopular: 5, imdb: 5, oscarImportance: 5 },
             genres: genrePreferences,
             oscars: oscarPreferences,
+            oscarImportance: ratingPreference?.oscarImportance ?? 5, // <-- add this line
         });
     } catch (error) {
         console.error("❌ Error fetching user preferences:", error);
@@ -67,13 +68,13 @@ router.get('/:userId', authenticate, async (req, res) => {
 router.post('/rating', authenticate, async (req, res) => {
     try {
         const userId = req.user.userId; // Use the user ID from the decoded token
-        const { rtCritic, rtPopular, imdb } = req.body;
+        const { rtCritic, rtPopular, imdb, oscarImportance } = req.body;
 
         console.log(`🔄 Saving rating preferences for user: ${userId}`);
 
         await RatingPreference.findOneAndUpdate(
-            { user: userId }, // Match by user ID
-            { $set: { rtCritic, rtPopular, imdb, user: userId } }, // Explicitly set the user field
+            { user: userId },
+            { $set: { rtCritic, rtPopular, imdb, oscarImportance, user: userId } },
             { upsert: true, new: true }
         );
         res.json({ message: 'Rating preferences saved' });

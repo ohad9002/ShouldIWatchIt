@@ -33,6 +33,7 @@ const Preferences = () => {
   const [oscarPreferences, setOscarPreferences] = useState<
     Record<string, number>
   >({});
+  const [oscarImportance, setOscarImportance] = useState<number>(5);
   const [loading, setLoading] = useState(true);
 
   const userId = user?.userId;
@@ -63,11 +64,12 @@ const Preferences = () => {
             },
           },
         );
-        const { ratings, genres, oscars } = preferencesResponse.data;
+        const { ratings, genres, oscars, oscarImportance } = preferencesResponse.data;
 
         setRatings(ratings);
         setGenrePreferences(genres);
         setOscarPreferences(oscars);
+        setOscarImportance(oscarImportance ?? 5);
       } catch (error) {
         console.error("Error fetching preferences:", error);
       } finally {
@@ -98,7 +100,7 @@ const Preferences = () => {
 
       await axios.post(
         `${API_BASE_URL}/api/preferences/rating`,
-        { ...ratings },
+        { ...ratings, oscarImportance },
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
@@ -187,6 +189,15 @@ const Preferences = () => {
             <ButtonRating
               value={ratings.imdb}
               onChange={(value: number) => handleRatingChange("imdb", value)}
+            />
+          </div>
+          <div className="flex flex-col items-center">
+            <label className="mb-2 text-center">
+              How much do Oscars matter to you?
+            </label>
+            <ButtonRating
+              value={oscarImportance}
+              onChange={setOscarImportance}
             />
           </div>
         </div>

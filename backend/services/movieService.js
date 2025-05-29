@@ -49,15 +49,16 @@ async function getMovieDecision(userId, movieData) {
         console.log(`   - Genre Prefs:`, genrePrefMap);
         console.log(`   - Oscar Prefs:`, oscarPrefMap);
 
+       
         // === Stage 1: Calculate Section Weights (using ALL preferences in DB) ===
         const avgRatingPref = (imdbPref + rtCriticPref + rtAudiencePref) / 3;
         const avgGenrePref = Object.values(genrePrefMap).reduce((a, b) => a + b, 0) / Object.values(genrePrefMap).length;
-        const avgOscarPref = Object.values(oscarPrefMap).reduce((a, b) => a + b, 0) / Object.values(oscarPrefMap).length;
-        const totalWeight = avgRatingPref + avgGenrePref + avgOscarPref;
+        const oscarImportance = ratingPrefs?.oscarImportance ?? 5; // <-- fetch from user prefs
+        const totalWeight = avgRatingPref + avgGenrePref + oscarImportance;
 
         const ratingWeight = avgRatingPref / totalWeight;
         const genreWeight = avgGenrePref / totalWeight;
-        const oscarWeight = avgOscarPref / totalWeight;
+        const oscarWeight = oscarImportance / totalWeight;
 
         console.log(`📊 Stage 1 Weights Calculation:`);
         console.log(`   - avgRatingPref: ${avgRatingPref.toFixed(2)}`);
@@ -135,15 +136,20 @@ async function getMovieDecision(userId, movieData) {
             imdbPref,
             rtCriticPref,
             rtAudiencePref,
-            genrePrefs: genrePrefs.map(pref => ({
-                name: pref.genre?.name,
-                preference: pref.preference
-            })),
+            genrePrefs: relevantGenrePrefs,
             oscarPrefs: oscarPrefs.map(pref => ({
                 category: pref.category?.name,
                 preference: pref.preference
             }))
         };
+
+        // Only include user preferences for the movie's genres
+        const relevantGenrePrefs = genreList
+          .map(g => ({
+            name: g,
+            preference: genrePrefMap[g] ?? 5
+          }))
+          .filter(g => g.name); // filter out undefined/null
 
         return await generateMovieDecision(movieData, formattedPrefs, finalScore);
 
