@@ -4,7 +4,7 @@ const express   = require('express');
 const jwt       = require('jsonwebtoken');
 const router    = express.Router();
 
-const { scrapeMovieDetails } = require('../utils/scrapeMovieDetails');
+const { scrapeMovieDetails } = require('../utils/scrapers/scrapeMovieDetails');
 const { getMovieDecision  } = require('../services/movieService');
 
 const SECRET_KEY = process.env.SECRET_KEY;
