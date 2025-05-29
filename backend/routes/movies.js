@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
     }
 
     console.log("✅ Movie data fetched successfully:", movieData);
-    res.json({ movieData });
+   res.json(movieData);
 
   } catch (err) {
     console.error("❌ Error in /api/movies route:", err);

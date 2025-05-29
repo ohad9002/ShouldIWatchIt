@@ -23,6 +23,10 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
+
 // 🌟 Connect to MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
