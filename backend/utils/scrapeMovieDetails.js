@@ -1,10 +1,10 @@
 const { chromium }       = require('playwright');
 const { scrapeRT }       = require('./scrapers/scrapeRT');
-const { scrapeIMDb }     = require('./scrapers/scrapeIMDb');
+const { fetchOMDb }      = require('./scrapers/fetchOMDb');
 const { scrapeOscars }   = require('./scrapers/scrapeOscars');
 const { normalizeGenre } = require('./normalization');
 
-console.log(`📍 [scrapeMovieDetails] loading IMDb scraper from: ${require.resolve('./scrapers/scrapeIMDb')}`);
+//console.log(`📍 [scrapeMovieDetails] loading IMDb scraper from: ${require.resolve('./scrapers/scrapeIMDb')}`);
 
 async function scrapeMovieDetails(title) {
   console.log(`🔍 scrapeMovieDetails("${title}")`);
@@ -15,8 +15,8 @@ async function scrapeMovieDetails(title) {
     // —— Rotten Tomatoes
     data.rottenTomatoes = await scrapeRT(page, title);
 
-    // —— IMDb
-    data.imdb = await scrapeIMDb(page, title);
+    // —— OMDb (instead of IMDb)
+    data.imdb = await fetchOMDb(title);
 
     // —— Oscars (only if we got an IMDb title back)
     if (data.imdb?.title && data.imdb.title !== 'N/A') {

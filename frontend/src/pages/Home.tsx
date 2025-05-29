@@ -39,7 +39,7 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
     try {
       if (!query) {
         console.warn(
-          "⚠️ No query provided. Prompting user to enter a movie title."
+          "⚠️ No query provided. Prompting user to enter a movie title.",
         );
         setError("Please enter a movie title.");
         return;
@@ -57,23 +57,21 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
         const decisionResponse = await fetchMovieDecision(query, user.token);
         console.log(
           "📥 AI Decision received from fetchMovieDecision:",
-          decisionResponse
+          decisionResponse,
         );
         setAiDecision({
           decision: decisionResponse.decision,
           explanation: decisionResponse.explanation,
         });
       } else {
-        console.log(
-          "ℹ️ User is not logged in. Skipping AI decision fetch."
-        );
+        console.log("ℹ️ User is not logged in. Skipping AI decision fetch.");
       }
     } catch (error) {
       console.error("❌ Error during handleSearch:", error);
       if (error instanceof Error) {
         setError(
           error.message ||
-            "Failed to fetch movie or AI decision. Please try again."
+            "Failed to fetch movie or AI decision. Please try again.",
         );
       } else {
         setError("Failed to fetch movie or AI decision. Please try again.");
@@ -167,7 +165,8 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
             </p>
             <p>
               <strong>Genres:</strong>{" "}
-              {movieData.rottenTomatoes.genres.join(", ")}
+              {Array.isArray(movieData.rottenTomatoes.genres) &&
+                movieData.rottenTomatoes.genres.map((g) => <span>{g}</span>)}
             </p>
             {movieData.oscars.length > 0 ? (
               <div>
