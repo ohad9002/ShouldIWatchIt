@@ -63,7 +63,7 @@ async function getMovieDecision(userId, movieData) {
         console.log(`📊 Stage 1 Weights Calculation:`);
         console.log(`   - avgRatingPref: ${avgRatingPref.toFixed(2)}`);
         console.log(`   - avgGenrePref: ${avgGenrePref.toFixed(2)}`);
-        console.log(`   - avgOscarPref: ${avgOscarPref.toFixed(2)}`);
+        console.log(`   - oscarImportance: ${oscarImportance.toFixed(2)}`);
         console.log(`   - totalWeight: ${totalWeight.toFixed(2)}`);
         console.log(`   - ratingWeight: ${(ratingWeight * 100).toFixed(2)}%`);
         console.log(`   - genreWeight: ${(genreWeight * 100).toFixed(2)}%`);

@@ -64,7 +64,8 @@ const Preferences = () => {
             },
           },
         );
-        const { ratings, genres, oscars, oscarImportance } = preferencesResponse.data;
+        const { ratings, genres, oscars, oscarImportance } =
+          preferencesResponse.data;
 
         setRatings(ratings);
         setGenrePreferences(genres);
