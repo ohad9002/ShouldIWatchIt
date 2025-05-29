@@ -1,30 +1,39 @@
 const fetch = require('node-fetch');
-const { calculateSimilarity, normalizeText } = require('../similarity');
+const { calculateSimilarity, normalizeText, generateTitleVariants } = require('../similarity');
 
-const OMDB_API_KEY = process.env.OMDB_API_KEY; // Set this in your Render environment variables
+const OMDB_API_KEY = process.env.OMDB_API_KEY;
 
 async function fetchOMDb(title) {
-  // Generate search variants
-  const variants = [
-    title,
-    normalizeText(title),
-    normalizeText(title).replace(/\b3\b/, 'iii'),
-    normalizeText(title).replace(/\biii\b/, '3'),
-    normalizeText(title).replace(/\bpart\b/, ''),
-  ].filter((v, i, arr) => v && arr.indexOf(v) === i);
+  const variants = generateTitleVariants(title);
 
   let allResults = [];
   for (const variant of variants) {
+    // Try search endpoint
     const searchUrl = `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&s=${encodeURIComponent(variant)}&type=movie`;
     const searchResp = await fetch(searchUrl);
-    if (!searchResp.ok) continue;
-    const searchData = await searchResp.json();
-    if (searchData.Search && Array.isArray(searchData.Search)) {
-      allResults.push(...searchData.Search);
+    if (searchResp.ok) {
+      const searchData = await searchResp.json();
+      if (searchData.Search && Array.isArray(searchData.Search)) {
+        allResults.push(...searchData.Search);
+      }
+    }
+    // Try direct title lookup
+    const directUrl = `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(variant)}`;
+    const directResp = await fetch(directUrl);
+    if (directResp.ok) {
+      const data = await directResp.json();
+      if (data.Response !== "False") {
+        allResults.push({
+          Title: data.Title,
+          imdbID: data.imdbID,
+          Poster: data.Poster,
+          Year: data.Year,
+        });
+      }
     }
   }
 
-  // Deduplicate results by imdbID
+  // Deduplicate by imdbID
   const seen = new Set();
   allResults = allResults.filter(r => {
     if (!r.imdbID || seen.has(r.imdbID)) return false;
@@ -32,14 +41,14 @@ async function fetchOMDb(title) {
     return true;
   });
 
-  // Score all results
+  // Score all results using normalized titles
   let best = { similarity: -1 };
   for (const result of allResults) {
-    const sim = calculateSimilarity(result.Title, title);
+    const sim = calculateSimilarity(normalizeText(result.Title), normalizeText(title));
     if (sim > best.similarity) best = { ...result, similarity: sim };
   }
 
-  // If no good match, fallback to direct title lookup
+  // If no good match, fallback to original direct lookup
   if (!best.imdbID || best.similarity < 0.5) {
     const url = `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}`;
     const resp = await fetch(url);

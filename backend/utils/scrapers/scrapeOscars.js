@@ -1,4 +1,4 @@
-const { calculateSimilarity } = require('../similarity');
+const { calculateSimilarity } = require('./similarity');
 
 async function scrapeOscars(page, movieTitle) {
   console.log("🎬 Starting Oscars scraping…");

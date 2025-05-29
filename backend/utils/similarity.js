@@ -116,7 +116,28 @@ function calculateSimilarity(a, b) {
   return Math.min(Math.max(score, 0), 1);
 }
 
+// Normalizes and generates robust variants for fuzzy movie title search
+function generateTitleVariants(title) {
+  const base = normalizeText(title);
+  const variants = new Set([
+    title,
+    base,
+    base.replace(/\b2\b/, 'ii'),
+    base.replace(/\bii\b/, '2'),
+    base.replace(/\b3\b/, 'iii'),
+    base.replace(/\biii\b/, '3'),
+    base.replace(/\bpart\b/g, ''),
+    base.replace(/\bpart\b/g, ': part'),
+    base.replace(/\bpart\b/g, ', part'),
+    base.replace(/[:,\-]/g, ''),
+    base.replace(/[:,\-]/g, ' ')
+  ]);
+  // Remove empty/duplicate
+  return Array.from(variants).filter(Boolean);
+}
+
 module.exports = {
   normalizeText,
-  calculateSimilarity
+  calculateSimilarity,
+  generateTitleVariants
 };
