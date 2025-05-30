@@ -132,9 +132,7 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
         {isLoading && (
           <>
             <PopcornLoader />
-            <p
-              className="text-center mt-4"
-            >
+            <p className="text-center mt-4">
               Please wait, this may take a few moments...
             </p>
           </>
