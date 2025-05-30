@@ -140,15 +140,27 @@ async function getMovieDecision(userId, movieData) {
           }))
           .filter(g => g.name); // filter out undefined/null
 
+        // Only include user preferences for the movie's Oscar-nominated categories
+        const relevantOscarPrefs = Array.isArray(movieData.oscars)
+          ? movieData.oscars
+              .map(o => {
+                // Try to match normalized Oscar category names
+                const userPref = oscarPrefMap[o.originalCategory] ?? oscarPrefMap[o.fullCategory] ?? 5;
+                return {
+                  category: o.originalCategory,
+                  preference: userPref
+                };
+              })
+              // Remove duplicates by category name
+              .filter((v, i, arr) => arr.findIndex(x => x.category === v.category) === i)
+          : [];
+
         const formattedPrefs = {
             imdbPref,
             rtCriticPref,
             rtAudiencePref,
             genrePrefs: relevantGenrePrefs,
-            oscarPrefs: oscarPrefs.map(pref => ({
-                category: pref.category?.name,
-                preference: pref.preference
-            }))
+            oscarPrefs: relevantOscarPrefs
         };
 
         return await generateMovieDecision(movieData, formattedPrefs, finalScore);

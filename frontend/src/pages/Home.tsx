@@ -132,7 +132,9 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
         {isLoading && (
           <>
             <PopcornLoader />
-            <p className="text-center mt-4" style={{ color: "var(--primary-color)" }}>
+            <p
+              className="text-center mt-4"
+            >
               Please wait, this may take a few moments...
             </p>
           </>

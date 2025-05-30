@@ -41,7 +41,11 @@ async function generateMovieDecision(movieData, userPrefs, finalScore) {
     ? userPrefs.genrePrefs.map(g => `${g.name} (${g.preference})`).join(", ")
     : "None"
 }
-    - Oscar preferences: ${userPrefs.oscarPrefs?.map(o => o.category).join(", ") || "None"}
+    - Oscar preferences (for this movie's nominations, 1-10): ${
+  userPrefs.oscarPrefs && userPrefs.oscarPrefs.length
+    ? userPrefs.oscarPrefs.map(o => `${o.category} (${o.preference})`).join(", ")
+    : "None"
+}
     
     The movie "${movieTitle}" has:
     - IMDb Rating: ${movieData.imdb?.rating || "N/A"}
