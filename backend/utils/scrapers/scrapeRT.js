@@ -15,10 +15,11 @@ async function scrapeRT(page, movieTitle) {
 
   // Block images, fonts, ads, analytics for speed
   await page.route('**/*', route => {
-    const u = route.request().url();
+    const url = route.request().url();
     if (
-      u.match(/\.(png|jpe?g|gif|svg|woff2?|ttf)$/i) ||
-      /doubleverify|adobedtm|amazon\.com\/assets|googletagmanager|analytics/.test(u)
+      /\.(png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|otf)$/i.test(url) ||
+      /doubleverify|adobedtm|googletagmanager|analytics|fandango|cookielaw|justwatch|pagead2|flximg|flxster|scorecardresearch|googlesyndication|amazon-adsystem|pubmatic|rubiconproject|criteo|adsafeprotected|moatads|taboola|outbrain|trustarc|privacyportal|onetrust|statcdn|pix\.nbcuni|mpx|scorecardresearch|fonts\.gstatic|fonts\.googleapis|editorial\.rottentomatoes|resizing\.flixster/i
+        .test(url)
     ) {
       return route.abort();
     }
@@ -37,7 +38,7 @@ async function scrapeRT(page, movieTitle) {
   try {
     console.time('[RT] Total time');
     console.time('[RT] goto-search');
-    await safeGoto(page, searchUrl, { waitUntil: 'networkidle', timeout: 15000 }); // Shorter timeout
+    await safeGoto(page, searchUrl, { waitUntil: 'domcontentloaded', timeout: 15000 }); // Shorter timeout
     console.timeEnd('[RT] goto-search');
 
     console.time('[RT] wait-search');
@@ -65,7 +66,7 @@ async function scrapeRT(page, movieTitle) {
 
     console.log(`🚀 [RT] Best match → ${best.url}`);
     console.time('[RT] goto-detail');
-    await safeGoto(page, best.url, { waitUntil: 'networkidle', timeout: 15000 }); // Shorter timeout
+    await safeGoto(page, best.url, { waitUntil: 'domcontentloaded', timeout: 15000 }); // Shorter timeout
     console.timeEnd('[RT] goto-detail');
 
     // wait for any of the score widgets or JSON-LD

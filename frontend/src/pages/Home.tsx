@@ -152,7 +152,9 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
               </div>
             )}
             <h3 className="text-2xl font-bold">
-              {movieData.rottenTomatoes.title}
+              {movieData.rottenTomatoes?.title ||
+                movieData.imdb?.title ||
+                "Movie not found"}
             </h3>
             {movieData.rottenTomatoes.image ? (
               <img
@@ -164,7 +166,7 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
               <p>No image available</p>
             )}
             <p>IMDb: {movieData.imdb.rating}</p>
-            <p>RT Critics: {movieData.rottenTomatoes.criticScore}</p>
+            <p>RT Critics: {movieData.rottenTomatoes?.criticScore || "N/A"}</p>
             <p>RT Audience: {movieData.rottenTomatoes.audienceScore}</p>
             <p>
               <strong>Release Date:</strong>{" "}
