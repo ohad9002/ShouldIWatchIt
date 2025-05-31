@@ -3,6 +3,7 @@ const { scrapeRT }       = require('./scrapeRT');
 const { fetchOMDb }      = require('./fetchOMDb');
 const { scrapeOscars }   = require('./scrapeOscars');
 const { normalizeGenre } = require('../normalization');
+const { parallelScrapeMovieDetails } = require('./parallelScrapeMovieDetails');
 
 //console.log(`📍 [scrapeMovieDetails] loading IMDb scraper from: ${require.resolve('./scrapers/scrapeIMDb')}`);
 

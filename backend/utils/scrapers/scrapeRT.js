@@ -1,5 +1,6 @@
 const { retry } = require('../retry');
 const { calculateSimilarity } = require('../similarity');
+const { blockUnwantedResources } = require('../blockUnwantedResources');
 
 // Helper to retry navigations
 async function safeGoto(page, url, options) {
@@ -14,17 +15,7 @@ async function scrapeRT(page, movieTitle) {
   console.log(`📌 [RT] Direct‐searching via URL…`);
 
   // Block images, fonts, ads, analytics for speed
-  await page.route('**/*', route => {
-    const url = route.request().url();
-    if (
-      /\.(png|jpe?g|gif|svg|webp|ico|woff2?|ttf|eot|otf)$/i.test(url) ||
-      /doubleverify|adobedtm|googletagmanager|analytics|fandango|cookielaw|justwatch|pagead2|flximg|flxster|scorecardresearch|googlesyndication|amazon-adsystem|pubmatic|rubiconproject|criteo|adsafeprotected|moatads|taboola|outbrain|trustarc|privacyportal|onetrust|statcdn|pix\.nbcuni|mpx|scorecardresearch|fonts\.gstatic|fonts\.googleapis|editorial\.rottentomatoes|resizing\.flixster/i
-        .test(url)
-    ) {
-      return route.abort();
-    }
-    return route.continue();
-  });
+  await blockUnwantedResources(page);
   page.on('requestfailed', req => {
     console.error(`❌ [RT] Request failed: ${req.url()} → ${req.failure()?.errorText}`);
   });
@@ -38,11 +29,11 @@ async function scrapeRT(page, movieTitle) {
   try {
     console.time('[RT] Total time');
     console.time('[RT] goto-search');
-    await safeGoto(page, searchUrl, { waitUntil: 'domcontentloaded', timeout: 15000 }); // Shorter timeout
+    await safeGoto(page, searchUrl, { waitUntil: 'domcontentloaded', timeout: 10000 }); // Shorter timeout
     console.timeEnd('[RT] goto-search');
 
     console.time('[RT] wait-search');
-    await page.waitForSelector('search-page-media-row', { timeout: 7000 }); // Shorter timeout
+    await page.waitForSelector('search-page-media-row', { timeout: 5000 }); // Shorter timeout
     console.timeEnd('[RT] wait-search');
 
     // pull the list of results
@@ -66,7 +57,7 @@ async function scrapeRT(page, movieTitle) {
 
     console.log(`🚀 [RT] Best match → ${best.url}`);
     console.time('[RT] goto-detail');
-    await safeGoto(page, best.url, { waitUntil: 'domcontentloaded', timeout: 15000 }); // Shorter timeout
+    await safeGoto(page, best.url, { waitUntil: 'domcontentloaded', timeout: 10000 }); // Shorter timeout
     console.timeEnd('[RT] goto-detail');
 
     // wait for any of the score widgets or JSON-LD

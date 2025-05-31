@@ -2,8 +2,8 @@
 
 const retry = async (fn, options = {}) => {
   const {
-    retries = 4,
-    delayMs  = 1500,
+    retries = 2,      // Lowered from 3 or 4
+    delayMs  = 1000,  // Lowered from 1500
     factor   = 2,
     jitter   = true
   } = options;

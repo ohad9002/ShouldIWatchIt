@@ -1,19 +1,10 @@
 const { calculateSimilarity } = require('../similarity');
+const { blockUnwantedResources } = require('../blockUnwantedResources');
 
 async function scrapeOscars(page, movieTitle) {
   console.log("🎬 Starting Oscars scraping…");
 
-  // Block images, fonts, ads, analytics for speed
-  await page.route('**/*', route => {
-    const url = route.request().url();
-    if (
-      /\.(png|jpe?g|gif|svg|woff2?|ttf)$/i.test(url) ||
-      /doubleverify|adobedtm|googletagmanager|analytics/.test(url)
-    ) {
-      return route.abort();
-    }
-    return route.continue();
-  });
+  await blockUnwantedResources(page);
 
   page.on('requestfailed', req => {
     console.error(`❌ [Oscars] Request failed: ${req.url()} → ${req.failure()?.errorText}`);
