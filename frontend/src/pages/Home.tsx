@@ -199,6 +199,18 @@ const Home = ({ resetTrigger }: { resetTrigger: boolean }) => {
             )}
           </div>
         )}
+        {!movieData && !isLoading && !error && (
+          <div className="mb-6 text-lg">
+            <p>
+              Not sure if a movie is worth your time? <strong>ShouldIWatchIt</strong> helps you decide by combining ratings from IMDb and Rotten Tomatoes, Oscar wins, and your personal preferences.
+              <br />
+              Enter a movie title above to get a smart, AI-powered calculation and recommendation.
+            </p>
+            <p className="mt-4 font-semibold text-primary">
+              For the full experience—including personalized recommendations and saving your preferences—please <strong>sign up</strong> and <strong>log in</strong>.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
